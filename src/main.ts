@@ -18,6 +18,7 @@ import { PondScene } from "./scene/scene.ts";
 import { PondAudio } from "./audio/pondAudio.ts";
 import { loadSave } from "./data/db.ts";
 import { dayKey, Persister } from "./data/persist.ts";
+import { WeatherSync } from "./data/weather.ts";
 import { Store } from "./ui/store.ts";
 import { Shell } from "./ui/shell.ts";
 
@@ -26,7 +27,10 @@ const settings: Settings = { ...DEFAULT_SETTINGS };
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const canvas = document.createElement("canvas");
 canvas.id = "pond";
-app.append(canvas);
+const labels = document.createElement("canvas");
+labels.id = "labels";
+const labelCtx = labels.getContext("2d")!;
+app.append(canvas, labels);
 
 const SEED = 7;
 const shapes = generateBed(SEED);
@@ -45,11 +49,14 @@ let sim: PondSimulation | null = null;
 let persister: Persister | null = null;
 let shell: Shell | null = null;
 let audio: PondAudio | null = null;
+let dpr = 1;
 
 function resize(): void {
   width = innerWidth;
   height = innerHeight;
-  const dpr = settings.quality === "eco" ? 1 : Math.max(1, Math.min(devicePixelRatio || 1, 2));
+  dpr = settings.quality === "eco" ? 1 : Math.max(1, Math.min(devicePixelRatio || 1, 2));
+  labels.width = Math.round(width * dpr);
+  labels.height = Math.round(height * dpr);
   if (sim) {
     sim.width = width;
     sim.height = height;
@@ -57,6 +64,33 @@ function resize(): void {
   }
   renderer?.resize(width, height, dpr, settings.quality);
   scene?.layout(width, height);
+}
+
+let labelsOn = false;
+function drawLabels(): void {
+  if (!sim) return;
+  if (!settings.names) {
+    if (labelsOn) {
+      labelCtx.clearRect(0, 0, labels.width, labels.height);
+      labelsOn = false;
+    }
+    return;
+  }
+  labelsOn = true;
+  labelCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  labelCtx.clearRect(0, 0, width, height);
+  labelCtx.font = '11px "LXGW WenKai","STKaiti","KaiTi",serif';
+  labelCtx.textAlign = "center";
+  labelCtx.lineJoin = "round";
+  labelCtx.lineWidth = 3;
+  labelCtx.strokeStyle = "rgba(34,52,45,.55)";
+  labelCtx.fillStyle = "#fbf9ec";
+  for (const f of sim.allFish) {
+    const x = f.x * width;
+    const y = f.y * height - 16 * f.size * sim.scale;
+    labelCtx.strokeText(f.name, x, y);
+    labelCtx.fillText(f.name, x, y);
+  }
 }
 
 let last = 0;
@@ -79,6 +113,7 @@ function frame(now: number): void {
   scene.update(dt, settings);
   scene.draw();
   renderer.render(time, dt, scene.look);
+  drawLabels();
 }
 
 async function boot(): Promise<void> {
@@ -100,6 +135,12 @@ async function boot(): Promise<void> {
   audio = new PondAudio();
   audio.configure(settings);
   const store = new Store(sim, settings, persister, resize, () => audio?.configure(settings));
+  const weatherSync = new WeatherSync(settings, (m) => {
+    store.set("weather", m.weather);
+    if (m.rainAmount !== undefined) store.set("rainAmount", m.rainAmount);
+    if (m.snowAmount !== undefined) store.set("snowAmount", m.snowAmount);
+  });
+  weatherSync.start();
 
   renderer = createRenderer(canvas, bedCanvas, buildSprites(), mask, depth, () => {
     location.reload();
@@ -110,7 +151,7 @@ async function boot(): Promise<void> {
   }
   scene = new PondScene(renderer, sim);
   scene.onLightning = (k) => audio?.thunderAfter(0.4 + Math.random() * 2.2, k);
-  shell = new Shell(app, sim, scene, persister, store, audio);
+  shell = new Shell(app, sim, scene, persister, store, audio, weatherSync);
   shell.bind(canvas);
   addEventListener("resize", resize);
   resize();

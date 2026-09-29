@@ -2,6 +2,7 @@ import type { PondSimulation } from "../core/simulation.ts";
 import type { Persister } from "../data/persist.ts";
 import type { PondScene } from "../scene/scene.ts";
 import type { PondAudio } from "../audio/pondAudio.ts";
+import type { WeatherSync } from "../data/weather.ts";
 import { TOKENS } from "../style.ts";
 import type { Store } from "./store.ts";
 import { elem } from "./dom.ts";
@@ -45,6 +46,7 @@ export class Shell {
     persister: Persister,
     store: Store,
     audio: PondAudio,
+    weatherSync: WeatherSync,
   ) {
     this.root = root;
     this.sim = sim;
@@ -109,6 +111,7 @@ export class Shell {
       sim,
       scene,
       persister,
+      weather: weatherSync,
       toast: (text) => this.toast(text),
       enterZen: () => {
         this.dialog.close();

@@ -3,6 +3,7 @@ import { BODY } from "../core/fish.ts";
 import type { Fish, Music, Quality, WaterType, Weather } from "../core/types.ts";
 import type { PondSimulation } from "../core/simulation.ts";
 import type { Persister } from "../data/persist.ts";
+import type { WeatherSync } from "../data/weather.ts";
 import type { PondScene } from "../scene/scene.ts";
 import { fishSprite } from "../art/koi.ts";
 import type { Store } from "./store.ts";
@@ -14,6 +15,7 @@ export interface PanelCtx {
   sim: PondSimulation;
   scene: PondScene;
   persister: Persister;
+  weather: WeatherSync;
   toast(text: string): void;
   enterZen(): void;
 }
@@ -90,10 +92,32 @@ export function renderRanking(content: HTMLElement, ctx: PanelCtx): void {
 export function renderWeather(content: HTMLElement, ctx: PanelCtx): void {
   const s = ctx.store.settings;
   const options = elem("div", { class: "weather-options" });
-  const select = (weather: Weather): void => {
+  const info = elem("div", { class: "panel-summary" });
+  const results = elem("div", { class: "city-results" });
+
+  const paintOptions = (): void => {
+    for (const b of Array.from(options.children)) {
+      const on = (b as HTMLElement).dataset.weather === s.weather;
+      b.classList.toggle("selected", on);
+      b.setAttribute("aria-pressed", String(on));
+    }
+  };
+  const syncInfo = (): void => {
+    const c = ctx.weather.current;
+    if (s.autoWeather && s.location)
+      info.textContent = c
+        ? `${s.location.name} · ${Math.round(c.temperature)}°C · 风速 ${Math.round(c.wind)} km/h`
+        : `${s.location.name} · 等待天气数据`;
+    else if (s.autoWeather) info.textContent = "尚未选择城市";
+    else info.textContent = "手动天气 · 由你说了算";
+  };
+
+  const pick = (weather: Weather): void => {
+    autoBox.checked = false;
+    ctx.store.set("autoWeather", false);
     ctx.store.set("weather", weather);
-    for (const b of Array.from(options.children))
-      b.classList.toggle("selected", (b as HTMLElement).dataset.weather === weather);
+    paintOptions();
+    syncInfo();
   };
   for (const [value, label] of WEATHERS)
     options.append(
@@ -103,11 +127,89 @@ export function renderWeather(content: HTMLElement, ctx: PanelCtx): void {
         "data-weather": value,
         "aria-pressed": String(s.weather === value),
         text: label,
-        onclick: () => select(value),
+        onclick: () => pick(value),
       }),
     );
+
+  const autoBox = toggle(s.autoWeather, "跟随城市天气", (v) => {
+    if (v && !s.location) {
+      autoBox.checked = false;
+      ctx.toast("先选择一个城市，再跟随它的天气");
+      return;
+    }
+    ctx.store.set("autoWeather", v);
+    if (v)
+      void ctx.weather.refresh().then((ok) => {
+        if (!ok) ctx.toast("暂时取不到城市天气，稍后再试");
+        paintOptions();
+        syncInfo();
+      });
+    else syncInfo();
+  });
+
+  const input = elem("input", {
+    type: "text",
+    class: "city-input",
+    placeholder: "搜索城市名",
+    "aria-label": "城市名",
+    maxlength: 40,
+  });
+  let controller: AbortController | null = null;
+  const searchForm = elem("form", {
+    class: "city-search",
+    onsubmit: (e) => {
+      e.preventDefault();
+      const q = input.value.trim();
+      if (!q) return;
+      controller?.abort();
+      controller = new AbortController();
+      results.replaceChildren(elem("span", { class: "small-note", text: "搜索中…" }));
+      void ctx.weather
+        .search(q, controller.signal)
+        .then((list) => {
+          if (!list.length) {
+            results.replaceChildren(
+              elem("span", { class: "small-note", text: "没有找到相关城市" }),
+            );
+            return;
+          }
+          results.replaceChildren(
+            ...list.map((loc) =>
+              elem("button", {
+                type: "button",
+                class: "city-result",
+                text: loc.name,
+                onclick: () => {
+                  ctx.store.set("location", loc);
+                  results.replaceChildren();
+                  input.value = "";
+                  ctx.toast(`已选择「${loc.name}」`);
+                  if (s.autoWeather)
+                    void ctx.weather.refresh().then(() => {
+                      paintOptions();
+                      syncInfo();
+                    });
+                  else syncInfo();
+                },
+              }),
+            ),
+          );
+        })
+        .catch(() => {
+          results.replaceChildren(
+            elem("span", { class: "small-note", text: "网络异常，稍后再试" }),
+          );
+        });
+    },
+  });
+  searchForm.append(input, elem("button", { type: "submit", text: "搜索" }));
+
   content.replaceChildren(
     options,
+    info,
+    controlRow("跟随城市天气", "自动同步所选城市的实时天气", autoBox),
+    searchForm,
+    results,
     controlRow(
       "月下观鱼",
       "夜色里，池中倒映今夜的月亮",
@@ -124,6 +226,7 @@ export function renderWeather(content: HTMLElement, ctx: PanelCtx): void {
       slider(s.snowAmount, 0, 1, 0.05, "雪量", (v) => ctx.store.set("snowAmount", v)),
     ),
   );
+  syncInfo();
 }
 
 export function renderSettings(content: HTMLElement, ctx: PanelCtx): void {
@@ -138,6 +241,11 @@ export function renderSettings(content: HTMLElement, ctx: PanelCtx): void {
       "青鲢鱼",
       "银鳞结伴，穿梭于锦鲤之间",
       toggle(s.silverCarp, "青鲢鱼", (v) => ctx.store.set("silverCarp", v)),
+    ),
+    controlRow(
+      "显示名字",
+      "在锦鲤头顶描出它的名字",
+      toggle(s.names, "显示名字", (v) => ctx.store.set("names", v)),
     ),
     controlRow(
       "画面品质",

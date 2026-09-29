@@ -23,6 +23,14 @@ body {
   height: 100%;
 }
 
+#labels {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 .bar {
   position: fixed;
   left: 50%;
@@ -226,6 +234,55 @@ body {
 
 .weather-option.selected {
   border-color: var(--accent);
+  background: var(--accent);
+  color: var(--paper);
+}
+
+.city-search {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0 4px;
+}
+
+.city-input {
+  flex: 1;
+  font: 13px var(--sans);
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.city-search button {
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--paper);
+  font: 12px/1 var(--sans);
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+
+.city-results {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.city-result {
+  text-align: left;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--shadow);
+  color: var(--ink);
+  font: 12px var(--sans);
+  cursor: pointer;
+}
+
+.city-result:hover {
   background: var(--accent);
   color: var(--paper);
 }
