@@ -8,6 +8,7 @@ export function dayKey(date: Date = new Date()): string {
 
 export class Persister {
   daily: DailyCount = { date: dayKey(), count: 0 };
+  packId: string | undefined;
   private readonly sim: PondSimulation;
   private readonly settings: Settings;
   private timer: ReturnType<typeof setTimeout> | undefined;
@@ -29,7 +30,9 @@ export class Persister {
         marks,
       }),
     );
-    return { fish, settings: { ...this.settings }, daily: { ...this.daily } };
+    const save: SanitizedSave = { fish, settings: { ...this.settings }, daily: { ...this.daily } };
+    if (this.packId) save.packId = this.packId;
+    return save;
   }
 
   schedule(): void {

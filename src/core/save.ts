@@ -102,7 +102,7 @@ function sanitizeDaily(raw: unknown): DailyCount | undefined {
 
 export function sanitizeSave(data: unknown): SanitizedSave | null {
   if (!data || typeof data !== "object") return null;
-  const src = data as { fish?: unknown; settings?: unknown; daily?: unknown };
+  const src = data as { fish?: unknown; settings?: unknown; daily?: unknown; packId?: unknown };
   if (!Array.isArray(src.fish) || src.fish.length === 0) return null;
 
   const fish: StoredFish[] = src.fish
@@ -129,5 +129,10 @@ export function sanitizeSave(data: unknown): SanitizedSave | null {
   if (fish.length === 0) return null;
   const settings = sanitizeSettings(src.settings);
   const daily = sanitizeDaily(src.daily);
-  return daily ? { fish, settings, daily } : { fish, settings };
+  const packId =
+    typeof src.packId === "string" && src.packId ? src.packId.slice(0, 200) : undefined;
+  const out: SanitizedSave = { fish, settings };
+  if (daily) out.daily = daily;
+  if (packId) out.packId = packId;
+  return out;
 }

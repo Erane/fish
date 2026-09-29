@@ -1,14 +1,19 @@
 import { PALETTES } from "../core/palette.ts";
 import { BODY } from "../core/fish.ts";
+import { parsePack } from "../core/pack.ts";
+import type { PondPack, Season } from "../core/pack.ts";
 import type { Fish, Music, Quality, WaterType, Weather } from "../core/types.ts";
 import type { PondSimulation } from "../core/simulation.ts";
 import type { Persister } from "../data/persist.ts";
+import { writeSave } from "../data/db.ts";
+import { importPack, listPacks, removePack } from "../data/packs.ts";
+import { PACK_PROMPT } from "../data/packPrompt.ts";
 import type { WeatherSync } from "../data/weather.ts";
 import type { PondScene } from "../scene/scene.ts";
 import { fishSprite } from "../art/koi.ts";
 import type { Store } from "./store.ts";
 import { KOI_LIMIT } from "./store.ts";
-import { controlRow, elem, select, slider, toggle } from "./dom.ts";
+import { confirmButton, controlRow, elem, select, slider, toggle } from "./dom.ts";
 
 export interface PanelCtx {
   store: Store;
@@ -47,6 +52,17 @@ const MUSICS: [Music, string][] = [
   ["chimes", "风铃"],
   ["off", "无"],
 ];
+
+const SEASON_LABELS: Record<Season, string> = {
+  spring: "春",
+  summer: "夏",
+  autumn: "秋",
+  winter: "冬",
+};
+
+function seasonSummary(pack: PondPack): string {
+  return (Object.keys(pack.seasons) as Season[]).map((s) => SEASON_LABELS[s]).join(" · ");
+}
 
 function thumbnail(f: Fish, ppu = 1.6): HTMLCanvasElement {
   const c = fishSprite({ palette: f.palette, seed: f.seed, marks: f.marks }, ppu);
@@ -327,6 +343,191 @@ export function renderSettings(content: HTMLElement, ctx: PanelCtx): void {
   );
 }
 
+export function renderPond(content: HTMLElement, ctx: PanelCtx): void {
+  const list = elem("div", { class: "pack-list" });
+
+  const enable = (id: string | undefined): void => {
+    ctx.persister.packId = id;
+    void writeSave(ctx.persister.snapshot()).then(() => location.reload());
+  };
+
+  const defaultRow = (): HTMLElement => {
+    const active = !ctx.persister.packId;
+    return elem(
+      "div",
+      { class: `pack-row${active ? " active" : ""}` },
+      elem(
+        "div",
+        { class: "pack-info" },
+        elem("span", { text: "默认池塘" }),
+        elem("small", { text: "程序生成 · 赛璐璐" }),
+      ),
+      active
+        ? elem("span", { class: "pack-badge", text: "使用中" })
+        : elem("button", {
+            type: "button",
+            class: "tile-btn",
+            text: "启用",
+            onclick: () => enable(undefined),
+          }),
+    );
+  };
+
+  const packRow = (pack: PondPack): HTMLElement => {
+    const active = ctx.persister.packId === pack.id;
+    const del = confirmButton("删除", () => {
+      void removePack(pack).then(() => {
+        ctx.toast(`已删除「${pack.name}」`);
+        if (active) enable(undefined);
+        else void paint();
+      });
+    });
+    return elem(
+      "div",
+      { class: `pack-row${active ? " active" : ""}` },
+      elem(
+        "div",
+        { class: "pack-info" },
+        elem("span", { text: pack.name }),
+        elem("small", { text: `${pack.style} · ${seasonSummary(pack)}` }),
+      ),
+      elem(
+        "div",
+        { class: "fish-actions" },
+        active
+          ? elem("span", { class: "pack-badge", text: "使用中" })
+          : elem("button", {
+              type: "button",
+              class: "tile-btn",
+              text: "启用",
+              onclick: () => enable(pack.id),
+            }),
+        del,
+      ),
+    );
+  };
+
+  const paint = async (): Promise<void> => {
+    const packs = await listPacks();
+    list.replaceChildren(defaultRow(), ...packs.map(packRow));
+  };
+
+  content.replaceChildren(
+    elem("p", { class: "panel-summary", text: "选择池塘底图 · 启用后重载生效" }),
+    list,
+    importForm(ctx, () => void paint(), enable),
+  );
+  void paint();
+}
+
+function importForm(
+  ctx: PanelCtx,
+  onImported: () => void,
+  enable: (id: string | undefined) => void,
+): HTMLElement {
+  const json = elem("textarea", {
+    class: "pack-json",
+    rows: 4,
+    placeholder: "粘贴池塘包 JSON，或选择 .json 文件",
+    "aria-label": "池塘包 JSON",
+  });
+  const seasonBox = elem("div", { class: "pack-seasons" });
+  const actions = elem("div", { class: "form-actions" });
+  const enableBox = toggle(true, "导入后立即启用", () => {});
+  const seasonInputs = new Map<Season, HTMLInputElement>();
+  let parsed: PondPack | null = null;
+
+  function submit(): void {
+    if (!parsed) return;
+    const files: Partial<Record<Season, Blob>> = {};
+    for (const [season, input] of seasonInputs) {
+      const f = input.files?.[0];
+      if (f) files[season] = f;
+    }
+    void importPack(parsed, files)
+      .then((bound) => {
+        ctx.toast(`已导入「${bound.name}」`);
+        onImported();
+        if (enableBox.checked) enable(bound.id);
+      })
+      .catch(() => ctx.toast("请至少为一个季节选择底图"));
+  }
+
+  function parse(): void {
+    seasonBox.replaceChildren();
+    actions.replaceChildren();
+    seasonInputs.clear();
+    parsed = null;
+    let raw: unknown;
+    try {
+      raw = JSON.parse(json.value);
+    } catch {
+      ctx.toast("JSON 解析失败，请检查内容");
+      return;
+    }
+    const pack = parsePack(raw);
+    if (!pack) {
+      ctx.toast("不是有效的池塘包（检查 format / water / seasons）");
+      return;
+    }
+    parsed = pack;
+    for (const season of Object.keys(pack.seasons) as Season[]) {
+      const input = elem("input", {
+        type: "file",
+        accept: "image/*",
+        "aria-label": `${SEASON_LABELS[season]}季底图`,
+      });
+      seasonInputs.set(season, input);
+      seasonBox.append(controlRow(`${SEASON_LABELS[season]}季底图`, "选择该季节的图片", input));
+    }
+    actions.append(
+      controlRow("立即启用", "导入后重载并应用", enableBox),
+      elem(
+        "div",
+        { class: "form-actions" },
+        elem("button", { type: "button", text: "导入", onclick: submit }),
+      ),
+    );
+    ctx.toast(`已解析「${pack.name}」· ${seasonSummary(pack)}`);
+  }
+
+  const fileInput = elem("input", {
+    type: "file",
+    accept: ".json,application/json",
+    "aria-label": "选择 JSON 文件",
+    onchange: (e) => {
+      const f = (e.target as HTMLInputElement).files?.[0];
+      if (f) void f.text().then((t) => (json.value = t));
+    },
+  });
+
+  return elem(
+    "div",
+    { class: "pack-import" },
+    elem("p", { class: "panel-summary", text: "导入池塘包" }),
+    json,
+    elem(
+      "div",
+      { class: "form-actions" },
+      fileInput,
+      elem("button", { type: "button", class: "secondary", text: "解析", onclick: parse }),
+      elem("button", {
+        type: "button",
+        class: "secondary",
+        text: "复制提示词",
+        onclick: () => {
+          void navigator.clipboard.writeText(PACK_PROMPT).then(
+            () => ctx.toast("提示词已复制，连底图一起交给外部 AI 即可"),
+            () => ctx.toast("浏览器拒绝了复制，请手动复制"),
+          );
+        },
+      }),
+    ),
+    seasonBox,
+    actions,
+  );
+}
+
 interface Draft {
   name: string;
   palette: number;
@@ -500,8 +701,6 @@ function buildPainter(draft: Draft): { canvas: HTMLElement; refresh: () => void 
 function koiTile(f: Fish, ctx: PanelCtx, redraw: () => void): HTMLElement {
   const name = elem("span", { class: "koi-tile-name", text: f.name });
   const edit = elem("button", { type: "button", class: "tile-btn", text: "改名" });
-  const release = elem("button", { type: "button", class: "tile-btn release", text: "放生" });
-  let armed: ReturnType<typeof setTimeout> | undefined;
   let input: HTMLInputElement | null = null;
 
   const commit = (): void => {
@@ -535,18 +734,7 @@ function koiTile(f: Fish, ctx: PanelCtx, redraw: () => void): HTMLElement {
     input.select();
   });
 
-  release.addEventListener("click", () => {
-    if (!armed) {
-      release.textContent = "确认放生";
-      release.classList.add("armed");
-      armed = setTimeout(() => {
-        armed = undefined;
-        release.textContent = "放生";
-        release.classList.remove("armed");
-      }, 3000);
-      return;
-    }
-    clearTimeout(armed);
+  const release = confirmButton("放生", () => {
     if (ctx.store.releaseKoi(f)) {
       ctx.scene.forget(f);
       ctx.toast(`「${f.name}」已放生，愿它自在悠游`);

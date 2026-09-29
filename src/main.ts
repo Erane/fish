@@ -9,8 +9,8 @@ import {
   sanitizeSave,
 } from "./core/index.ts";
 import type { Settings } from "./core/types.ts";
-import { generateBed } from "./render/bedShapes.ts";
-import { bedDepth, floatMask, paintBed } from "./render/bedPaint.ts";
+import { builtinBed, packBed } from "./render/pondBed.ts";
+import type { PondBed } from "./render/pondBed.ts";
 import { buildSprites } from "./art/sprites.ts";
 import { createRenderer } from "./render/renderer.ts";
 import { QUALITY_SPEC, tierDpr } from "./render/quality.ts";
@@ -18,6 +18,7 @@ import type { Renderer } from "./render/types.ts";
 import { PondScene } from "./scene/scene.ts";
 import { PondAudio } from "./audio/pondAudio.ts";
 import { loadSave } from "./data/db.ts";
+import { resolvePack } from "./data/packs.ts";
 import { dayKey, Persister } from "./data/persist.ts";
 import { WeatherSync } from "./data/weather.ts";
 import { Store } from "./ui/store.ts";
@@ -34,15 +35,11 @@ const labelCtx = labels.getContext("2d")!;
 app.append(canvas, labels);
 
 const SEED = 7;
-const shapes = generateBed(SEED);
 
 let width = innerWidth;
 let height = innerHeight;
-const bedW = 1600;
-const bedH = Math.max(2, Math.round((bedW * height) / width));
-const bedCanvas = paintBed(shapes, bedW, bedH, 1);
-const mask = floatMask(shapes, bedW, bedH);
-const depth = bedDepth(shapes, bedW, bedH, SEED);
+
+let bed: PondBed = builtinBed(SEED, 1600, Math.max(2, Math.round((1600 * height) / width)));
 
 let renderer: Renderer | null = null;
 let scene: PondScene | null = null;
@@ -52,6 +49,23 @@ let shell: Shell | null = null;
 let audio: PondAudio | null = null;
 let dpr = 1;
 let labelDpr = 1;
+
+function updateBoundary(): void {
+  if (!sim || !renderer) return;
+  if (!bed.boundary) {
+    sim.boundary = null;
+    return;
+  }
+  const poly: number[] = [];
+  for (let i = 0; i < bed.boundary.length; i += 2) {
+    const [sx, sy] = renderer.imageToScreen(
+      bed.boundary[i]! * bed.bedW,
+      bed.boundary[i + 1]! * bed.bedH,
+    );
+    poly.push(sx, sy);
+  }
+  sim.boundary = poly;
+}
 
 function resize(): void {
   width = innerWidth;
@@ -67,6 +81,7 @@ function resize(): void {
   }
   renderer?.resize(width, height, dpr, settings.quality);
   scene?.layout(width, height);
+  updateBoundary();
 }
 
 let labelsOn = false;
@@ -126,6 +141,10 @@ function frame(now: number): void {
 async function boot(): Promise<void> {
   const saved = sanitizeSave(await loadSave());
   if (saved) Object.assign(settings, saved.settings);
+  if (saved?.packId) {
+    const resolved = await resolvePack(saved.packId);
+    if (resolved) bed = packBed(resolved.pack, resolved.asset, resolved.image);
+  }
   const fish = saved?.fish
     ? saved.fish.map((f) => revive(f))
     : [createFish(0), createFish(1), createFish(2), createFish(3), createFish(4)];
@@ -138,6 +157,7 @@ async function boot(): Promise<void> {
     settings.silverCarp,
   );
   persister = new Persister(sim, settings);
+  persister.packId = saved?.packId;
   if (saved?.daily?.date === dayKey()) persister.daily = saved.daily;
   audio = new PondAudio();
   audio.configure(settings);
@@ -149,14 +169,23 @@ async function boot(): Promise<void> {
   });
   weatherSync.start();
 
-  renderer = createRenderer(canvas, bedCanvas, buildSprites(), mask, depth, () => {
-    location.reload();
-  });
+  renderer = createRenderer(
+    canvas,
+    bed.texture,
+    buildSprites(),
+    bed.mask,
+    bed.depth,
+    bed.water,
+    () => {
+      location.reload();
+    },
+  );
   if (!renderer) {
     app.textContent = "当前浏览器无法绘制池塘";
     return;
   }
-  scene = new PondScene(renderer, sim, shapes, bedW, bedH);
+  scene = new PondScene(renderer, sim, bed);
+  scene.setSeasonTint(bed.tint);
   scene.onLightning = (k) => audio?.thunderAfter(0.4 + Math.random() * 2.2, k);
   shell = new Shell(app, sim, scene, persister, store, audio, weatherSync);
   shell.bind(canvas);

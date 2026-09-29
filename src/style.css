@@ -444,6 +444,70 @@ body {
   color: var(--accent);
 }
 
+.pack-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.pack-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 2px;
+  border-bottom: 1px solid var(--line);
+}
+
+.pack-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pack-info span {
+  font: 13px/1.2 var(--sans);
+}
+
+.pack-info small {
+  font: 10px/1.2 var(--sans);
+  color: var(--accent);
+}
+
+.pack-badge {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--paper);
+  font: 10px/1 var(--sans);
+  white-space: nowrap;
+}
+
+.pack-import {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.pack-json {
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
+  font: 12px/1.5 var(--sans);
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.pack-import input[type="file"] {
+  font: 11px var(--sans);
+  color: var(--accent);
+}
+
 .exit-zen {
   position: fixed;
   top: 18px;

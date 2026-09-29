@@ -6,14 +6,15 @@ import type { WeatherSync } from "../data/weather.ts";
 import { TOKENS } from "../style.ts";
 import type { Store } from "./store.ts";
 import { elem } from "./dom.ts";
-import { renderKoi, renderRanking, renderSettings, renderWeather } from "./panels.ts";
+import { renderKoi, renderPond, renderRanking, renderSettings, renderWeather } from "./panels.ts";
 import type { PanelCtx } from "./panels.ts";
 
-type PanelKind = "koi" | "weather" | "settings" | "ranking";
+type PanelKind = "koi" | "weather" | "pond" | "settings" | "ranking";
 
 const TITLES: Record<PanelKind, string> = {
   koi: "我的锦鲤",
   weather: "池塘天气",
+  pond: "池塘底图",
   settings: "池塘设置",
   ranking: "锦鲤食量榜",
 };
@@ -62,6 +63,7 @@ export class Shell {
     const labels: [PanelKind, string][] = [
       ["koi", "锦鲤"],
       ["weather", "天气"],
+      ["pond", "底图"],
       ["ranking", "食量榜"],
       ["settings", "设置"],
     ];
@@ -207,6 +209,7 @@ export class Shell {
     const render = {
       koi: renderKoi,
       weather: renderWeather,
+      pond: renderPond,
       settings: renderSettings,
       ranking: renderRanking,
     }[this.active];

@@ -141,4 +141,5 @@ export interface SanitizedSave {
   fish: StoredFish[];
   settings: Partial<Settings>;
   daily?: DailyCount;
+  packId?: string;
 }

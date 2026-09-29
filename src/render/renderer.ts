@@ -82,6 +82,7 @@ export function createRenderer(
   sprites: SpriteSet,
   floatMask: HTMLCanvasElement | null,
   depth: DepthField | null,
+  water: HTMLCanvasElement | null,
   onLost?: () => void,
 ): Renderer | null {
   const glCtx = canvas.getContext("webgl2", {
@@ -249,6 +250,7 @@ export function createRenderer(
     gl.REPEAT,
   );
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
 
   const bedTex = gl.createTexture()!;
   gl.bindTexture(gl.TEXTURE_2D, bedTex);
@@ -276,6 +278,26 @@ export function createRenderer(
     );
   gl.generateMipmap(gl.TEXTURE_2D);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  const waterTex = gl.createTexture()!;
+  gl.bindTexture(gl.TEXTURE_2D, waterTex);
+  if (water) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, water);
+  else
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.RGBA8,
+      1,
+      1,
+      0,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      new Uint8Array([255, 255, 255, 255]),
+    );
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
@@ -558,6 +580,8 @@ export function createRenderer(
     gl.uniform1i(p.u("uCloud"), 4);
     bindTex(5, depthTex);
     gl.uniform1i(p.u("uDepth"), 5);
+    bindTex(6, waterTex);
+    gl.uniform1i(p.u("uWater"), 6);
     drawQuad();
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
@@ -616,6 +640,8 @@ export function createRenderer(
     gl.uniform1i(p.u("uFloat"), 3);
     bindTex(4, state.cloud!.tex);
     gl.uniform1i(p.u("uCloud"), 4);
+    bindTex(5, waterTex);
+    gl.uniform1i(p.u("uWater"), 5);
     drawQuad();
 
     if (batches.floaters.ni) {

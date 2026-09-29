@@ -1,9 +1,8 @@
 import { clamp, TAU, wrap } from "../core/index.ts";
 import type { Obstacle, Settings } from "../core/types.ts";
-import type { BedShape } from "../render/bedShapes.ts";
 import type { Look, Renderer, Vec4 } from "../render/types.ts";
 import { absorption } from "./look.ts";
-import { budAnchors, crabHomes, obstacleAnchors, spotAnchors } from "./anchors.ts";
+import type { BedAnchors } from "./anchors.ts";
 import { BUTTERFLY_COUNT, CRAB_COUNT, TURTLE_COUNT } from "../art/creatures.ts";
 
 type Rnd = () => number;
@@ -730,7 +729,7 @@ export class Creatures {
   private readonly bedW: number;
   private readonly bedH: number;
   private readonly m: number;
-  private readonly shapes: BedShape[];
+  private readonly anchors: BedAnchors;
   readonly turtles: Turtle[];
   private readonly butterflies: Butterfly[];
   private readonly dragonflies: Dragonfly[];
@@ -751,7 +750,7 @@ export class Creatures {
 
   constructor(
     R: Renderer,
-    shapes: BedShape[],
+    anchors: BedAnchors,
     bedW: number,
     bedH: number,
     stir: Stir,
@@ -763,7 +762,7 @@ export class Creatures {
     this.bedW = bedW;
     this.bedH = bedH;
     this.m = Math.min(bedW, bedH);
-    this.shapes = shapes;
+    this.anchors = anchors;
     this.turtles = [0, 1].map((v) => new Turtle(v % TURTLE_COUNT, rnd));
     this.butterflies = [0, 1, 2].map((s) => new Butterfly(s % BUTTERFLY_COUNT, rnd));
     this.dragonflies = [new Dragonfly(rnd() < 0.7 ? 0 : 1, rnd)];
@@ -780,13 +779,13 @@ export class Creatures {
     this.k = Math.hypot(x1 - x0, y1 - y0);
     const inside = (p: [number, number]): boolean =>
       p[0] > 20 && p[0] < w - 20 && p[1] > 20 && p[1] < h - 20;
-    this.spots = spotAnchors(this.shapes)
+    this.spots = this.anchors.spots
       .map(([x, y]) => R.imageToScreen(x * this.bedW, y * this.bedH))
       .filter(inside);
-    this.buds = budAnchors(this.shapes)
+    this.buds = this.anchors.buds
       .map(([x, y]) => R.imageToScreen(x * this.bedW, y * this.bedH))
       .filter(inside);
-    this.homes = crabHomes(this.shapes)
+    this.homes = this.anchors.homes
       .map((c) => ({
         hx: c.x * this.bedW,
         hy: c.y * this.bedH,
@@ -803,7 +802,7 @@ export class Creatures {
     this.prevW = w;
     this.prevH = h;
     const obstacles: Obstacle[] = [];
-    for (const a of obstacleAnchors(this.shapes)) {
+    for (const a of this.anchors.obstacles) {
       const [sx, sy] = R.imageToScreen(a.x * this.bedW, a.y * this.bedH);
       obstacles.push({ x: sx, y: sy, r: a.r * this.m * this.k });
     }

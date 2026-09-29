@@ -4,6 +4,7 @@ import type { Settings } from "../src/core/types.ts";
 import type { BedShape } from "../src/render/bedShapes.ts";
 import type { Look, Renderer, SpriteDef } from "../src/render/types.ts";
 import { Creatures } from "../src/scene/creatures.ts";
+import { anchorsFromShapes } from "../src/scene/anchors.ts";
 
 const fakeDef: SpriteDef = {
   canvas: {} as HTMLCanvasElement,
@@ -47,12 +48,13 @@ const look = {
 const settings = (over: Partial<Settings>): Settings => ({ ...DEFAULT_SETTINGS, ...over });
 
 const ROCK = [shape("rock", 0.5, 0.5, 0.09), shape("leaf", 0.3, 0.6, 0.08)];
+const ROCK_ANCHORS = anchorsFromShapes(ROCK);
 
 describe("Creatures", () => {
   it("derives sim obstacles from rocks and big leaves", () => {
     const c = new Creatures(
       stubR({}),
-      ROCK,
+      ROCK_ANCHORS,
       1600,
       900,
       () => {},
@@ -68,7 +70,7 @@ describe("Creatures", () => {
     const counts: Record<string, number> = {};
     const c = new Creatures(
       stubR(counts),
-      ROCK,
+      ROCK_ANCHORS,
       1600,
       900,
       () => {},
@@ -89,7 +91,7 @@ describe("Creatures", () => {
     const counts: Record<string, number> = {};
     const c = new Creatures(
       stubR(counts),
-      ROCK,
+      ROCK_ANCHORS,
       1600,
       900,
       () => {},
@@ -117,7 +119,7 @@ describe("Creatures", () => {
     const counts: Record<string, number> = {};
     const c = new Creatures(
       stubR(counts),
-      ROCK,
+      ROCK_ANCHORS,
       1600,
       900,
       () => {},
@@ -144,7 +146,7 @@ describe("Creatures", () => {
     const counts: Record<string, number> = {};
     const c = new Creatures(
       stubR(counts),
-      ROCK,
+      ROCK_ANCHORS,
       1600,
       900,
       () => {},

@@ -78,7 +78,7 @@ void main(){
 
 export const FS_BED = `#version 300 es
 precision highp float;
-uniform sampler2D uBed, uShadow, uCaustic, uFloat, uCloud, uDepth;
+uniform sampler2D uBed, uShadow, uCaustic, uFloat, uCloud, uDepth, uWater;
 uniform vec3 uBedU, uBedV, uDeepTint, uCausticTint, uPaper; uniform vec2 uFloatShift, uShadowTexel; uniform float uCausticK, uShadowK, uDepthK, uBedLod, uBedSoft, uPosterize, uPosterMix, uPaperMix, uPaperLift;
 in vec2 vUv; out vec4 o;
 ${BED}
@@ -88,15 +88,16 @@ float shadowAt(vec2 uv, float lod){
 }
 void main(){
   vec2 b = bedUv(vUv);
+  float wt = texture(uWater, b).r;
   float dep = texture(uDepth, b).r * uDepthK;
   vec3 c = mix(textureLod(uBed, b, uBedLod + dep * uBedSoft).rgb, textureLod(uBed, b, 5.).rgb * .82, texture(uFloat, b).r);
   c = mix(c, floor(c * uPosterize + .5) / uPosterize, uPosterMix);
   c = mix(c, c * (1. - uPaperLift) + uPaper * uPaperLift, uPaperMix);
-  c *= mix(vec3(1.), uDeepTint, dep);
+  c *= mix(vec3(1.), uDeepTint, dep * wt);
   float sun = 1. - texture(uCloud, vUv).r;
   float sh = max(shadowAt(vUv, .3 + (1. - sun) * 1.7), textureLod(uFloat, b - uFloatShift, 2. + (1. - sun)).g * .6) * mix(.42, 1., sun);
   c *= 1. - sh * uShadowK * vec3(1., .86, .72);
-  c += texture(uCaustic, vUv).r * uCausticK * uCausticTint * (1. - sh) * mix(.06, 1., sun * sun) * (1. - dep * .55);
+  c += texture(uCaustic, vUv).r * uCausticK * uCausticTint * (1. - sh) * mix(.06, 1., sun * sun) * (1. - dep * .55) * wt;
   o = vec4(c, 1.);
 }`;
 
@@ -164,7 +165,7 @@ export const MIST = `float mistAt(vec2 px, float t){
 
 export const FS_FINAL = `#version 300 es
 precision highp float;
-uniform sampler2D uScene, uSurface, uFloat, uNoise, uCloud;
+uniform sampler2D uScene, uSurface, uFloat, uNoise, uCloud, uWater;
 uniform vec4 uMoonDisc; uniform vec3 uBedU, uBedV; uniform vec2 uView;
 uniform float uRefract, uGlint, uSkyK, uVignette, uMoon, uBright, uSat, uShade, uTime, uCloudShade, uMist, uFlash, uGrain;
 uniform vec3 uGlintColor, uSky, uTint, uSun;
@@ -174,14 +175,15 @@ ${MIST}
 ${BED}
 void main(){
   vec4 sf = texture(uSurface, vUv);
-  vec2 g = (sf.rg - .5) * 4.;
+  float wt = texture(uWater, bedUv(vUv)).r;
+  vec2 g = (sf.rg - .5) * 4. * wt;
   vec3 N = normalize(vec3(-g, 1.));
   vec3 col = texture(uScene, clamp(vUv + N.xy * uRefract / uView, .001, .999)).rgb;
   float cloud = texture(uCloud, vUv).r, dim = cloud * uCloudShade;
   col *= (1. - dim) * (1. + dot(-g, normalize(uSun.xy)) * uShade * (1. - cloud * .6));
   col = mix(col * vec3(1.025, 1.01, .98), vec3(dot(col, vec3(.299, .587, .114))) * vec3(.93, .99, 1.07), min(1., dim * 1.1));
-  col = mix(col, uSky, clamp(uSkyK * (1. + length(g) * 5.) + dim * .06, 0., .6));
-  vec3 glint = uGlintColor * sf.b * 2.4 * uGlint * (1. - cloud * .92), night = vec3(0.);
+  col = mix(col, uSky, clamp(uSkyK * wt * (1. + length(g) * 5.) + dim * .06, 0., .6));
+  vec3 glint = uGlintColor * sf.b * 2.4 * uGlint * (1. - cloud * .92) * wt, night = vec3(0.);
   if (uMoon > 0.) {
     vec2 px = vUv * uView, rp = px + g * 22., d = (rp - uMoonDisc.xy) / uMoonDisc.z;
     float r = length(d), s = sqrt(max(0., 1. - d.y * d.y)), k = cos(uMoonDisc.w), illum = .5 - .5 * k;
@@ -202,7 +204,7 @@ void main(){
     vec2 toMoon = normalize(uMoonDisc.xy - px + 1e-4);
     float reach = exp(-length(px - uMoonDisc.xy) / (uMoonDisc.z * 16.));
     night += vec3(.55, .66, .9) * (max(0., dot(-g, toMoon)) * .6 + length(g) * .14) * (.35 + .65 * reach) * (.4 + .6 * illum);
-    night = (night + glint) * uMoon * (1. - cloud * .9);
+    night = (night + glint) * uMoon * (1. - cloud * .9) * wt;
     glint = vec3(0.);
   }
   col += glint;

@@ -57,6 +57,26 @@ export function toggle(
   });
 }
 
+export function confirmButton(label: string, onConfirm: () => void): HTMLButtonElement {
+  const button = elem("button", { type: "button", class: "tile-btn release", text: label });
+  let armed: ReturnType<typeof setTimeout> | undefined;
+  button.addEventListener("click", () => {
+    if (!armed) {
+      button.textContent = `确认${label}`;
+      button.classList.add("armed");
+      armed = setTimeout(() => {
+        armed = undefined;
+        button.textContent = label;
+        button.classList.remove("armed");
+      }, 3000);
+      return;
+    }
+    clearTimeout(armed);
+    onConfirm();
+  });
+  return button;
+}
+
 export function select<T extends string>(
   value: T,
   options: readonly (readonly [T, string])[],

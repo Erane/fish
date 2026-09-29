@@ -2,7 +2,7 @@ import { BODY, clamp, fishPalette, fishPose, TAU } from "../core/index.ts";
 import type { Fish, Food, Obstacle, Settings, Weather } from "../core/types.ts";
 import { FISH_PPU } from "../render/batch.ts";
 import type { BodyLight, Look, Renderer, Vec2, Vec3, Vec4 } from "../render/types.ts";
-import type { BedShape } from "../render/bedShapes.ts";
+import type { PondBed } from "../render/pondBed.ts";
 import { hexToRgb01 } from "../style.ts";
 import { PALETTES } from "../core/palette.ts";
 import { fishSprite, girthOf, halfWidth } from "../art/koi.ts";
@@ -90,12 +90,13 @@ export class PondScene {
   };
   look: Look;
   onLightning: ((strength: number) => void) | null = null;
+  private seasonTint: Vec3 | null = null;
   w = 1;
   h = 1;
   scale = 1;
   time = 0;
 
-  constructor(R: Renderer, sim: SimView, shapes: BedShape[], bedW: number, bedH: number) {
+  constructor(R: Renderer, sim: SimView, bed: PondBed) {
     this.R = R;
     this.sim = sim;
     this.pose = new Float32Array((BODY.segments + 1) * 4);
@@ -106,10 +107,12 @@ export class PondScene {
     this.calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
     this.phase = moonPhase();
     this.look = lookFor("sunny", false);
-    this.floaters = new Floaters(R, shapes, bedW, bedH, (x, y, s, leaf) =>
+    this.floaters = new Floaters(R, bed.decor, bed.bedW, bed.bedH, (x, y, s, leaf) =>
       this.splash(x, y, s, leaf),
     );
-    this.creatures = new Creatures(R, shapes, bedW, bedH, (x, y, r, s) => this.stir(x, y, r, s));
+    this.creatures = new Creatures(R, bed.anchors, bed.bedW, bed.bedH, (x, y, r, s) =>
+      this.stir(x, y, r, s),
+    );
   }
 
   layout(w: number, h: number): void {
@@ -133,8 +136,20 @@ export class PondScene {
     this.look.cloudWind = [this.cloudWind[0], this.cloudWind[1]];
   }
 
+  setSeasonTint(hex: string | null): void {
+    this.seasonTint = hex ? hexToRgb01(hex) : null;
+  }
+
   setLook(weather: Weather, night: boolean, dt: number, rain = 0.5, snow = 0.5): void {
     const target = lookFor(weather, night, rain, snow);
+    if (this.seasonTint) {
+      const t = this.seasonTint;
+      target.water = [
+        target.water[0] * 0.5 + t[0] * 0.5,
+        target.water[1] * 0.5 + t[1] * 0.5,
+        target.water[2] * 0.5 + t[2] * 0.5,
+      ];
+    }
     if (dt <= 0) this.look = target;
     else lerpLook(this.look, target, 1 - Math.exp(-dt * 1.1));
     this.applyRuntime();

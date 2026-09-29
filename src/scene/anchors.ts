@@ -59,3 +59,19 @@ export function obstacleAnchors(shapes: BedShape[]): ObstacleAnchor[] {
     .filter((s) => (s.kind === "rock" && s.above > 0) || isBigLeaf(s))
     .map((s) => ({ x: s.x, y: s.y, r: s.size * (s.kind === "rock" ? 0.95 : 0.55) }));
 }
+
+export interface BedAnchors {
+  spots: [number, number][];
+  buds: [number, number][];
+  homes: CrabHome[];
+  obstacles: ObstacleAnchor[];
+}
+
+export function anchorsFromShapes(shapes: BedShape[]): BedAnchors {
+  return {
+    spots: spotAnchors(shapes),
+    buds: budAnchors(shapes),
+    homes: crabHomes(shapes),
+    obstacles: obstacleAnchors(shapes),
+  };
+}

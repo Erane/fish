@@ -1,5 +1,6 @@
 import { BODY, updateSpine } from "./fish.ts";
 import { clamp, TAU, wrap } from "./math.ts";
+import { pushInside, signedDistToPoly } from "./boundary.ts";
 import type { EatEvent, Fish, Food, Obstacle } from "./types.ts";
 
 export class PondSimulation {
@@ -14,6 +15,7 @@ export class PondSimulation {
   scale = 1;
   time = 0;
   obstacles: Obstacle[] = [];
+  boundary: number[] | null = null;
   events: EatEvent[] = [];
 
   constructor(
@@ -85,6 +87,11 @@ export class PondSimulation {
       const dy = (gy - f.y) * h;
       const d = Math.hypot(dx, dy);
       if (this.obstacles.some((o) => Math.hypot(gx * w - o.x, gy * h - o.y) < o.r + 40)) continue;
+      if (
+        this.boundary &&
+        signedDistToPoly(gx * w, gy * h, this.boundary) < BODY.length * f.size * this.scale * 0.8
+      )
+        continue;
       const sc =
         -Math.abs(wrap(Math.atan2(dy, dx) - f.angle)) * 1.2 +
         (Math.min(d, span * 0.6) / span) * 2 +
@@ -252,16 +259,28 @@ export class PondSimulation {
       ax /= al;
       ay /= al;
     }
-    const mX = Math.min(w * 0.1 + L * 0.3, w * 0.3);
-    const mY = Math.min(h * 0.1 + L * 0.3, h * 0.3);
     const lx = x + cos * L * 1.2;
     const ly = y + sin * L * 1.2;
     let bx = 0;
     let by = 0;
-    if (lx < mX) bx = (mX - lx) / mX;
-    else if (lx > w - mX) bx = (w - mX - lx) / mX;
-    if (ly < mY) by = (mY - ly) / mY;
-    else if (ly > h - mY) by = (h - mY - ly) / mY;
+    if (this.boundary) {
+      const M = L * 1.2 + 12;
+      const sd = signedDistToPoly(lx, ly, this.boundary);
+      if (sd < M) {
+        const [tx, ty] = pushInside(lx, ly, this.boundary, M);
+        const dl = Math.hypot(tx - lx, ty - ly) || 1;
+        const k = clamp(1 - sd / M, 0, 1) * 1.6;
+        bx += ((tx - lx) / dl) * k;
+        by += ((ty - ly) / dl) * k;
+      }
+    } else {
+      const mX = Math.min(w * 0.1 + L * 0.3, w * 0.3);
+      const mY = Math.min(h * 0.1 + L * 0.3, h * 0.3);
+      if (lx < mX) bx = (mX - lx) / mX;
+      else if (lx > w - mX) bx = (w - mX - lx) / mX;
+      if (ly < mY) by = (mY - ly) / mY;
+      else if (ly > h - mY) by = (h - mY - ly) / mY;
+    }
     for (const ob of this.obstacles)
       for (const [px, py, R] of [
         [lx, ly, ob.r + L * 0.4],
@@ -307,8 +326,14 @@ export class PondSimulation {
       Math.min(1, dt * 3);
     x += Math.cos(f.angle) * f.v * dt;
     y += Math.sin(f.angle) * f.v * dt;
-    f.x = clamp(x / w, 0.03, 0.97);
-    f.y = clamp(y / h, 0.035, 0.965);
+    if (this.boundary) {
+      const [px, py] = pushInside(x, y, this.boundary, L * 0.55);
+      f.x = px / w;
+      f.y = py / h;
+    } else {
+      f.x = clamp(x / w, 0.03, 0.97);
+      f.y = clamp(y / h, 0.035, 0.965);
+    }
     f.depth += (f.depthGoal - f.depth) * Math.min(1, dt * (food ? 1.2 : 0.35));
     updateSpine(f, s, w, h);
   }
