@@ -142,10 +142,276 @@ body {
 }
 
 .rank-score {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
   font:
     18px Georgia,
     serif;
   color: var(--accent);
+}
+
+.rank-score small {
+  font: 10px/1 var(--sans);
+}
+
+.fish-thumb {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: auto;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 2px;
+  border-bottom: 1px solid var(--line);
+}
+
+.setting-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.setting-row span {
+  font: 13px/1.2 var(--sans);
+}
+
+.setting-row small {
+  font: 10px/1.4 var(--sans);
+  color: var(--accent);
+}
+
+.setting-row input[type="range"] {
+  width: 150px;
+  accent-color: var(--accent);
+}
+
+.setting-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.setting-row select {
+  font: 12px var(--sans);
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.weather-options {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 14px 0 6px;
+}
+
+.weather-option {
+  padding: 14px 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 12px/1 var(--sans);
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+
+.weather-option.selected {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--paper);
+}
+
+.fish-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+  margin: 10px 0 18px;
+}
+
+.fish-tile {
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+}
+
+.fish-tile-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.koi-tile-name {
+  font: 12px/1.2 var(--sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.koi-tile-input {
+  width: 100%;
+  font: 12px var(--sans);
+  padding: 2px 4px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+}
+
+.fish-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 3px;
+}
+
+.tile-btn {
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--shadow);
+  color: var(--accent);
+  font: 10px/1 var(--sans);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tile-btn.release.armed {
+  background: var(--rust);
+  color: var(--paper);
+}
+
+.add-koi {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.painter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.koi-preview {
+  flex: 1;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  background: var(--shadow);
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.paint-color {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+}
+
+.add-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.koi-name {
+  font: 13px var(--sans);
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.palette-picker {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.swatch {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 2px solid var(--line);
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--spot) 0 42%, var(--base) 42% 100%);
+  cursor: pointer;
+}
+
+.swatch.selected {
+  border-color: var(--accent);
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.form-actions button {
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--paper);
+  font: 12px/1 var(--sans);
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+
+.form-actions button.secondary {
+  background: var(--shadow);
+  color: var(--accent);
+}
+
+.small-note {
+  margin-right: auto;
+  font: 10px/1.4 var(--sans);
+  color: var(--accent);
+}
+
+.exit-zen {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  padding: 9px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--accent);
+  font: 11px/1 var(--sans);
+  letter-spacing: 1px;
+  cursor: pointer;
+  opacity: 0.4;
+  transition: opacity 0.25s;
+}
+
+.exit-zen:hover {
+  opacity: 1;
+}
+
+.zen .bar,
+.zen .toast {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
 }
 
 .toast {

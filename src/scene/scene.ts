@@ -121,6 +121,11 @@ export class PondScene {
     this.R.drop(x, y, r, s);
   }
 
+  forget(f: Fish): void {
+    this.wakes.delete(f);
+    this.R.drop(f.x * this.w, f.y * this.h, 12 * this.scale, 0.8);
+  }
+
   sync(): void {
     this.sim.allFish.forEach((f, i) => {
       let e = this.entries.get(f);

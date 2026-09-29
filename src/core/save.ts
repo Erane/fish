@@ -12,6 +12,10 @@ import type {
 
 const MARK_COLOR = /^#[0-9a-f]{6}$/i;
 
+export function cleanKoiName(raw: string): string {
+  return raw.trim().slice(0, 12);
+}
+
 const WEATHER = ["sunny", "cloudy", "rain", "snow"];
 const QUALITY = ["high", "eco"];
 const WATER_TYPE = ["stream", "spring", "cascade", "lapping", "bamboo"];
@@ -110,7 +114,7 @@ export function sanitizeSave(data: unknown): SanitizedSave | null {
       const defaults = createFish(i, randomSeed(i + 8));
       return {
         id: typeof f.id === "string" ? f.id.slice(0, 80) : defaults.id,
-        name: (f.name as string).trim().slice(0, 12) || defaults.name,
+        name: cleanKoiName(f.name as string) || defaults.name,
         palette: Number.isInteger(f.palette)
           ? clamp(f.palette as number, 0, PALETTES.length - 1)
           : 0,

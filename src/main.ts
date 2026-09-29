@@ -17,6 +17,7 @@ import type { Renderer } from "./render/types.ts";
 import { PondScene } from "./scene/scene.ts";
 import { loadSave } from "./data/db.ts";
 import { dayKey, Persister } from "./data/persist.ts";
+import { Store } from "./ui/store.ts";
 import { Shell } from "./ui/shell.ts";
 
 const settings: Settings = { ...DEFAULT_SETTINGS };
@@ -93,6 +94,7 @@ async function boot(): Promise<void> {
   );
   persister = new Persister(sim, settings);
   if (saved?.daily?.date === dayKey()) persister.daily = saved.daily;
+  const store = new Store(sim, settings, persister, resize);
 
   renderer = createRenderer(canvas, bedCanvas, buildSprites(), mask, depth, () => {
     location.reload();
@@ -102,7 +104,7 @@ async function boot(): Promise<void> {
     return;
   }
   scene = new PondScene(renderer, sim);
-  shell = new Shell(app, sim, scene, persister);
+  shell = new Shell(app, sim, scene, persister, store);
   shell.bind(canvas);
   addEventListener("resize", resize);
   resize();

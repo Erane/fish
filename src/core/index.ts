@@ -6,4 +6,4 @@ export { DEEP_TINT, sampleDepth } from "./depth.ts";
 export { DEFAULT_SETTINGS } from "./settings.ts";
 export { BODY, createFish, createSilverCarpShoal, revive, updateSpine, fishPose } from "./fish.ts";
 export { PondSimulation } from "./simulation.ts";
-export { sanitizeSave } from "./save.ts";
+export { sanitizeSave, cleanKoiName } from "./save.ts";
