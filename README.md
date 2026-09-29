@@ -58,3 +58,7 @@ pnpm icons      # 重新生成应用图标
 ## 灵感来源
 
 本项目灵感来自 [moli-xia/fishwallpaper](https://github.com/moli-xia/fishwallpaper)：素材形式（锦鲤花色、池塘小动物、天气与音效设定）与交互方式（轻点水面投喂、食量榜、月下观鱼等）保留自源仓库；代码为 TypeScript + Vite 的完全重写与重构，未采用源仓库代码。
+
+## 许可证
+
+本项目基于 [MIT](LICENSE) 协议开源。

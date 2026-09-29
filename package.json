@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "知鱼 · 可交互的锦鲤池塘动态壁纸（PWA）",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vp dev",
