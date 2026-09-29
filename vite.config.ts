@@ -4,6 +4,7 @@ import { VitePWA } from "vite-plugin-pwa";
 const OPEN_METEO = /^https:\/\/(api|geocoding-api)\.open-meteo\.com\//;
 
 export default defineConfig({
+  base: "/fish/",
   server: { host: true },
   plugins: [
     VitePWA({
