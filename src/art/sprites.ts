@@ -1,6 +1,7 @@
 import { TAU } from "../core/index.ts";
 import { FISH_SHADE } from "../style.ts";
 import type { SpriteDef, SpriteSet } from "../render/types.ts";
+import { creatureSprites } from "./creatures.ts";
 
 function canvas(w: number, h: number): HTMLCanvasElement {
   const c = document.createElement("canvas");
@@ -145,5 +146,6 @@ export function buildSprites(): SpriteSet {
     ring: ringSprite(),
     streak: streakSprite(),
     pellet: pelletSprite(),
+    ...creatureSprites(),
   };
 }
