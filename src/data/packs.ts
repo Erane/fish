@@ -1,5 +1,5 @@
 import { pickSeason, seasonForDate } from "../core/pack.ts";
-import type { PondPack, Season, SeasonAsset } from "../core/pack.ts";
+import type { PackSprites, PondPack, Season, SeasonAsset } from "../core/pack.ts";
 import {
   deleteAsset,
   deletePack,
@@ -10,15 +10,22 @@ import {
   writePack,
 } from "./db.ts";
 
+export type SkinSpecies = keyof PackSprites;
+
 export interface ResolvedPack {
   pack: PondPack;
   season: Season;
   asset: SeasonAsset;
   image: HTMLImageElement;
+  skins: Partial<Record<SkinSpecies, HTMLImageElement>>;
 }
 
 export function seasonAssetId(packId: string, season: Season): string {
   return `asset-${packId}-${season}`;
+}
+
+export function skinAssetId(packId: string, species: SkinSpecies): string {
+  return `skin-${packId}-${species}`;
 }
 
 export function bindAssets(pack: PondPack, ids: Partial<Record<Season, string>>): PondPack {
@@ -33,6 +40,7 @@ export function bindAssets(pack: PondPack, ids: Partial<Record<Season, string>>)
 export async function importPack(
   pack: PondPack,
   files: Partial<Record<Season, Blob>>,
+  skins: Partial<Record<SkinSpecies, Blob>> = {},
 ): Promise<PondPack> {
   const ids: Partial<Record<Season, string>> = {};
   const seasons: PondPack["seasons"] = {};
@@ -45,9 +53,16 @@ export async function importPack(
     seasons[season] = asset;
   }
   if (!Object.keys(seasons).length) throw new Error("no images");
-  const bound = bindAssets({ ...pack, seasons }, ids);
-  await writePack(bound);
-  return bound;
+  const { sprites: _stale, ...bound } = bindAssets({ ...pack, seasons }, ids);
+  const sprites: PackSprites = {};
+  for (const [species, blob] of Object.entries(skins) as [SkinSpecies, Blob][]) {
+    const id = skinAssetId(pack.id, species);
+    await writeAsset(id, blob);
+    sprites[species] = id;
+  }
+  const out: PondPack = Object.keys(sprites).length ? { ...bound, sprites } : bound;
+  await writePack(out);
+  return out;
 }
 
 export async function removePack(pack: PondPack): Promise<void> {
@@ -86,7 +101,14 @@ export async function resolvePack(id: string, date = new Date()): Promise<Resolv
   if (!blob) return null;
   try {
     const image = await decode(blob);
-    return { pack, season, asset, image };
+    const skins: ResolvedPack["skins"] = {};
+    for (const [species, id] of Object.entries(pack.sprites ?? {}) as [SkinSpecies, string][]) {
+      const sb = await loadAsset(id);
+      if (!sb) continue;
+      const img = await decode(sb).catch(() => null);
+      if (img) skins[species] = img;
+    }
+    return { pack, season, asset, image, skins };
   } catch {
     return null;
   }

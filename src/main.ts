@@ -12,6 +12,9 @@ import type { Settings } from "./core/types.ts";
 import { builtinBed, packBed } from "./render/pondBed.ts";
 import type { PondBed } from "./render/pondBed.ts";
 import { buildSprites } from "./art/sprites.ts";
+import { fishSkin } from "./art/skin.ts";
+import type { FishSkin } from "./art/skin.ts";
+import type { PackSprites } from "./core/pack.ts";
 import { createRenderer } from "./render/renderer.ts";
 import { QUALITY_SPEC, tierDpr } from "./render/quality.ts";
 import type { Renderer } from "./render/types.ts";
@@ -141,9 +144,17 @@ function frame(now: number): void {
 async function boot(): Promise<void> {
   const saved = sanitizeSave(await loadSave());
   if (saved) Object.assign(settings, saved.settings);
+  const skins: Partial<Record<keyof PackSprites, FishSkin>> = {};
   if (saved?.packId) {
     const resolved = await resolvePack(saved.packId);
-    if (resolved) bed = packBed(resolved.pack, resolved.asset, resolved.image);
+    if (resolved) {
+      bed = packBed(resolved.pack, resolved.asset, resolved.image);
+      for (const [sp, img] of Object.entries(resolved.skins) as [
+        keyof PackSprites,
+        HTMLImageElement,
+      ][])
+        skins[sp] = fishSkin(img);
+    }
   }
   const fish = saved?.fish
     ? saved.fish.map((f) => revive(f))
@@ -186,6 +197,7 @@ async function boot(): Promise<void> {
   }
   scene = new PondScene(renderer, sim, bed);
   scene.setSeasonTint(bed.tint);
+  scene.setSkins(skins);
   scene.onLightning = (k) => audio?.thunderAfter(0.4 + Math.random() * 2.2, k);
   shell = new Shell(app, sim, scene, persister, store, audio, weatherSync);
   shell.bind(canvas);

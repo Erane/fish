@@ -6,6 +6,8 @@ import type { PondBed } from "../render/pondBed.ts";
 import { hexToRgb01 } from "../style.ts";
 import { PALETTES } from "../core/palette.ts";
 import { fishSprite, girthOf, halfWidth } from "../art/koi.ts";
+import type { FishSkin } from "../art/skin.ts";
+import type { PackSprites } from "../core/pack.ts";
 import { absorption, lerpLook, lookFor } from "./look.ts";
 import { moonPhase } from "./moon.ts";
 import type { MoonPhase } from "./moon.ts";
@@ -91,6 +93,7 @@ export class PondScene {
   look: Look;
   onLightning: ((strength: number) => void) | null = null;
   private seasonTint: Vec3 | null = null;
+  private skins: Partial<Record<keyof PackSprites, FishSkin>> = {};
   w = 1;
   h = 1;
   scale = 1;
@@ -173,6 +176,22 @@ export class PondScene {
     this.R.drop(f.x * this.w, f.y * this.h, 12 * this.scale, 0.8);
   }
 
+  setSkins(skins: Partial<Record<keyof PackSprites, FishSkin>>): void {
+    this.skins = skins;
+    for (const f of this.sim.allFish) {
+      const e = this.entries.get(f);
+      if (e) {
+        e.ready = false;
+        e.light = undefined;
+        e.canvas = undefined;
+      }
+    }
+  }
+
+  private skinFor(f: Fish): FishSkin | undefined {
+    return this.skins[f.species === "silvercarp" ? "silvercarp" : "koi"];
+  }
+
   sync(): void {
     this.sim.allFish.forEach((f, i) => {
       let e = this.entries.get(f);
@@ -181,7 +200,8 @@ export class PondScene {
         this.entries.set(f, e);
       }
       if (!e.ready || e.cell !== i) {
-        if (!e.canvas) e.canvas = fishSprite(f, FISH_PPU);
+        const skin = this.skinFor(f);
+        e.canvas = skin ? skin.canvas : (e.canvas ?? fishSprite(f, FISH_PPU));
         this.R.setFish(i, e.canvas);
         e.cell = i;
         e.ready = true;
@@ -198,18 +218,24 @@ export class PondScene {
     const pal = fishPalette(f);
     if (e.light && e.light.seed === f.seed && e.light.palette === f.palette) return e.light;
     const girth = girthOf(f.seed);
-    const widths = new Float32Array(BODY.segments + 1);
-    for (let i = 0; i <= BODY.segments; i++)
-      widths[i] =
-        halfWidth(BODY.nose - (i * BODY.length) / BODY.segments, girth, pal.kind) / BODY.half;
+    const skin = this.skinFor(f);
+    const widths = skin
+      ? skin.widths
+      : (() => {
+          const w = new Float32Array(BODY.segments + 1);
+          for (let i = 0; i <= BODY.segments; i++)
+            w[i] =
+              halfWidth(BODY.nose - (i * BODY.length) / BODY.segments, girth, pal.kind) / BODY.half;
+          return w;
+        })();
     const kind = pal.kind;
     e.light = {
       species: f.species,
       seed: f.seed,
       palette: f.palette,
       widths,
-      metal: kind === "ogon" ? 1 : 0,
-      gloss: kind === "ogon" ? 0.3 : kind === "karasu" ? 0.12 : 0.26,
+      metal: skin ? 0 : kind === "ogon" ? 1 : 0,
+      gloss: skin ? 0.26 : kind === "ogon" ? 0.3 : kind === "karasu" ? 0.12 : 0.26,
     };
     return e.light;
   }
