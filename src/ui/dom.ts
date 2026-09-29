@@ -20,6 +20,30 @@ export function elem<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    /* 非安全上下文或失焦时异步 API 会拒绝，回退到 execCommand */
+  }
+  const ta = elem("textarea", { readonly: true });
+  ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.top = "0";
+  ta.style.left = "0";
+  ta.style.opacity = "0";
+  document.body.append(ta);
+  ta.focus();
+  ta.select();
+  ta.setSelectionRange(0, text.length);
+  const ok = document.execCommand("copy");
+  ta.remove();
+  return ok;
+}
+
 export function controlRow(label: string, hint: string, control: HTMLElement): HTMLDivElement {
   const text = elem("div", {}, elem("span", { text: label }), elem("small", { text: hint }));
   return elem("div", { class: "setting-row" }, text, control);
