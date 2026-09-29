@@ -10,7 +10,6 @@ function basePack(over: Partial<PondPack> = {}): PondPack {
     style: "cel",
     water: {
       polygon: [0.2, 0.2, 0.8, 0.2, 0.8, 0.8, 0.2, 0.8],
-      depth: { w: 2, h: 2, data: [0, 0.5, 0.5, 1] },
       obstacles: [],
       anchors: { crabHomes: [], spots: [], buds: [] },
     },

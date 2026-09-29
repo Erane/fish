@@ -10,7 +10,6 @@ function basePack(over: Partial<PondPack> = {}): PondPack {
     style: "cel",
     water: {
       polygon: [0.2, 0.2, 0.8, 0.2, 0.8, 0.8, 0.2, 0.8],
-      depth: { w: 2, h: 2, data: [0, 0.5, 0.5, 1] },
       obstacles: [{ x: 0.5, y: 0.5, r: 0.05 }],
       anchors: { crabHomes: [], spots: [], buds: [] },
     },
@@ -60,19 +59,6 @@ describe("parsePack", () => {
     const p = basePack();
     p.water.polygon = [0.2, 0.2, "x", 0.2, 0.8, 0.8, 0.2, 0.8] as unknown as number[];
     expect(parsePack(p)).toBeNull();
-  });
-
-  it("rejects depth data whose length disagrees with w*h", () => {
-    const p = basePack();
-    p.water.depth = { w: 3, h: 3, data: [0, 0.5, 1] };
-    expect(parsePack(p)).toBeNull();
-  });
-
-  it("clamps depth values into 0..1", () => {
-    const p = basePack();
-    p.water.depth = { w: 1, h: 2, data: [-3, 9] };
-    const out = parsePack(p)!;
-    expect(Array.from(out.water.depth.data)).toEqual([0, 1]);
   });
 
   it("drops obstacles with a non-positive radius", () => {

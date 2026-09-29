@@ -3,12 +3,6 @@ import { clamp } from "./math.ts";
 export const SEASONS = ["spring", "summer", "autumn", "winter"] as const;
 export type Season = (typeof SEASONS)[number];
 
-export interface PackDepth {
-  w: number;
-  h: number;
-  data: number[];
-}
-
 export interface PackObstacle {
   x: number;
   y: number;
@@ -23,7 +17,6 @@ export interface PackAnchors {
 
 export interface PackWater {
   polygon: number[];
-  depth: PackDepth;
   obstacles: PackObstacle[];
   anchors: PackAnchors;
 }
@@ -74,21 +67,6 @@ function polygon(raw: unknown): number[] | null {
     out.push(n);
   }
   return out;
-}
-
-function depth(raw: unknown): PackDepth | null {
-  if (!isObj(raw)) return null;
-  const w = Math.round(Number(raw.w));
-  const h = Math.round(Number(raw.h));
-  if (!Number.isFinite(w) || !Number.isFinite(h) || w < 1 || h < 1 || w * h > 1 << 20) return null;
-  if (!Array.isArray(raw.data) || raw.data.length !== w * h) return null;
-  const data: number[] = [];
-  for (const d of raw.data) {
-    const n = num(d, 0, 1);
-    if (n === null) return null;
-    data.push(n);
-  }
-  return { w, h, data };
 }
 
 function obstacles(raw: unknown): PackObstacle[] {
@@ -172,9 +150,8 @@ export function parsePack(raw: unknown): PondPack | null {
   if (typeof raw.id !== "string" || !raw.id) return null;
   if (!isObj(raw.water)) return null;
   const poly = polygon(raw.water.polygon);
-  const d = depth(raw.water.depth);
   const sea = seasons(raw.seasons);
-  if (!poly || !d || !sea) return null;
+  if (!poly || !sea) return null;
   const out: PondPack = {
     format: 1,
     id: raw.id.slice(0, 200),
@@ -182,7 +159,6 @@ export function parsePack(raw: unknown): PondPack | null {
     style: typeof raw.style === "string" ? raw.style.slice(0, 40) : "cel",
     water: {
       polygon: poly,
-      depth: d,
       obstacles: obstacles(raw.water.obstacles),
       anchors: anchors(raw.water.anchors),
     },

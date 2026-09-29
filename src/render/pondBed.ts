@@ -1,5 +1,6 @@
 import type { DepthField } from "../core/types.ts";
 import type { PondPack, SeasonAsset } from "../core/pack.ts";
+import { depthFromPolygon } from "../core/depth.ts";
 import { generateBed } from "./bedShapes.ts";
 import type { BedShape } from "./bedShapes.ts";
 import { bedDepth, floatMask, paintBed } from "./bedPaint.ts";
@@ -71,13 +72,14 @@ export function packBed(
   texture.width = bedW;
   texture.height = bedH;
   texture.getContext("2d")!.drawImage(image as CanvasImageSource, 0, 0, bedW, bedH);
-  const { w, h, data } = pack.water.depth;
+  const dw = 128;
+  const dh = Math.max(1, Math.round((dw * bedH) / bedW));
   const a = pack.water.anchors;
   return {
     texture,
     mask: null,
     water: pack.water.polygon.length >= 6 ? waterMask(pack.water.polygon) : null,
-    depth: { w, h, data: Float32Array.from(data) },
+    depth: depthFromPolygon(pack.water.polygon, dw, dh),
     anchors: {
       spots: a.spots.map(([x, y]) => [x, y] as [number, number]),
       buds: a.buds.map(([x, y]) => [x, y] as [number, number]),
