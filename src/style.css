@@ -508,6 +508,32 @@ body {
   color: var(--accent);
 }
 
+.pack-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.pack-prompt summary {
+  font: 11px var(--sans);
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.pack-prompt textarea {
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 6px;
+  resize: vertical;
+  font: 12px/1.5 var(--sans);
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+  color: var(--ink);
+}
+
 .exit-zen {
   position: fixed;
   top: 18px;

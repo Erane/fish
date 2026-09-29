@@ -7,13 +7,14 @@ import type { PondSimulation } from "../core/simulation.ts";
 import type { Persister } from "../data/persist.ts";
 import { writeSave } from "../data/db.ts";
 import { importPack, listPacks, removePack } from "../data/packs.ts";
-import { PACK_PROMPT } from "../data/packPrompt.ts";
+import type { SkinSpecies } from "../data/packs.ts";
+import { PACK_PROMPT, SKIN_PROMPT } from "../data/packPrompt.ts";
 import type { WeatherSync } from "../data/weather.ts";
 import type { PondScene } from "../scene/scene.ts";
 import { fishSprite } from "../art/koi.ts";
 import type { Store } from "./store.ts";
 import { KOI_LIMIT } from "./store.ts";
-import { confirmButton, controlRow, elem, select, slider, toggle } from "./dom.ts";
+import { confirmButton, controlRow, copyText, elem, select, slider, toggle } from "./dom.ts";
 
 export interface PanelCtx {
   store: Store;
@@ -60,8 +61,41 @@ const SEASON_LABELS: Record<Season, string> = {
   winter: "冬",
 };
 
+const SPECIES_LABELS: Record<SkinSpecies, string> = {
+  koi: "锦鲤皮肤",
+  silvercarp: "银鲩皮肤",
+};
+
 function seasonSummary(pack: PondPack): string {
   return (Object.keys(pack.seasons) as Season[]).map((s) => SEASON_LABELS[s]).join(" · ");
+}
+
+function promptBlock(
+  label: string,
+  summary: string,
+  text: string,
+  toast: (msg: string) => void,
+): HTMLElement {
+  return elem(
+    "div",
+    { class: "pack-prompt" },
+    elem("button", {
+      type: "button",
+      class: "secondary",
+      text: label,
+      onclick: () => {
+        void copyText(text).then((ok) =>
+          toast(ok ? `${label}已复制` : "复制失败，请展开下方全文手动复制"),
+        );
+      },
+    }),
+    elem(
+      "details",
+      {},
+      elem("summary", { text: summary }),
+      elem("textarea", { readonly: true, rows: 10, value: text }),
+    ),
+  );
 }
 
 function thumbnail(f: Fish, ppu = 1.6): HTMLCanvasElement {
@@ -432,9 +466,11 @@ function importForm(
     "aria-label": "池塘包 JSON",
   });
   const seasonBox = elem("div", { class: "pack-seasons" });
+  const skinBox = elem("div", { class: "pack-skins" });
   const actions = elem("div", { class: "form-actions" });
   const enableBox = toggle(true, "导入后立即启用", () => {});
   const seasonInputs = new Map<Season, HTMLInputElement>();
+  const skinInputs = new Map<SkinSpecies, HTMLInputElement>();
   let parsed: PondPack | null = null;
 
   function submit(): void {
@@ -444,7 +480,12 @@ function importForm(
       const f = input.files?.[0];
       if (f) files[season] = f;
     }
-    void importPack(parsed, files)
+    const skins: Partial<Record<SkinSpecies, Blob>> = {};
+    for (const [species, input] of skinInputs) {
+      const f = input.files?.[0];
+      if (f) skins[species] = f;
+    }
+    void importPack(parsed, files, skins)
       .then((bound) => {
         ctx.toast(`已导入「${bound.name}」`);
         onImported();
@@ -455,8 +496,10 @@ function importForm(
 
   function parse(): void {
     seasonBox.replaceChildren();
+    skinBox.replaceChildren();
     actions.replaceChildren();
     seasonInputs.clear();
+    skinInputs.clear();
     parsed = null;
     let raw: unknown;
     try {
@@ -479,6 +522,15 @@ function importForm(
       });
       seasonInputs.set(season, input);
       seasonBox.append(controlRow(`${SEASON_LABELS[season]}季底图`, "选择该季节的图片", input));
+    }
+    for (const species of ["koi", "silvercarp"] as SkinSpecies[]) {
+      const input = elem("input", {
+        type: "file",
+        accept: "image/*",
+        "aria-label": SPECIES_LABELS[species],
+      });
+      skinInputs.set(species, input);
+      skinBox.append(controlRow(SPECIES_LABELS[species], "可选 · 透明底、鼻朝右的鱼贴图", input));
     }
     actions.append(
       controlRow("立即启用", "导入后重载并应用", enableBox),
@@ -511,19 +563,21 @@ function importForm(
       { class: "form-actions" },
       fileInput,
       elem("button", { type: "button", class: "secondary", text: "解析", onclick: parse }),
-      elem("button", {
-        type: "button",
-        class: "secondary",
-        text: "复制提示词",
-        onclick: () => {
-          void navigator.clipboard.writeText(PACK_PROMPT).then(
-            () => ctx.toast("提示词已复制，连底图一起交给外部 AI 即可"),
-            () => ctx.toast("浏览器拒绝了复制，请手动复制"),
-          );
-        },
-      }),
+    ),
+    promptBlock(
+      "复制底图提示词",
+      "底图提示词全文（剪贴板不可用时手动复制）",
+      PACK_PROMPT,
+      ctx.toast,
+    ),
+    promptBlock(
+      "复制鱼皮肤提示词",
+      "鱼皮肤提示词全文（剪贴板不可用时手动复制）",
+      SKIN_PROMPT,
+      ctx.toast,
     ),
     seasonBox,
+    skinBox,
     actions,
   );
 }

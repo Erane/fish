@@ -22,7 +22,12 @@
 
 ## 给外部 AI 的提示词
 
-单一来源：`src/data/packPrompt.ts` 的 `PACK_PROMPT`（含结构示例）。「底图」面板的「复制提示词」按钮复制的即此文本。本文不重复其内容，以免分叉。
+单一来源：`src/data/packPrompt.ts`。分两段，对应两种不同性质的任务：
+
+- `PACK_PROMPT`：底图分析（看图回填水面/深度/锚点 JSON，含结构示例）。
+- `SKIN_PROMPT`：鱼皮肤生成（凭空画一张透明底、鼻朝右的鱼贴图，与底图无关）。
+
+「底图」面板对应两个复制按钮（`复制底图提示词` / `复制鱼皮肤提示词`），各带一份可展开只读全文供剪贴板不可用时手抄。本文不重复其内容，以免分叉。
 
 ## 存储
 
@@ -32,4 +37,10 @@
 
 ## 画风
 
-`style` 为自由字符串标签（`cel`/`realistic`/`anime`…），仅用于分类展示，不影响渲染。画风由底图与（未来的）精灵贴图本身决定。精灵贴图自定义属后续里程碑，本轮不涉及。
+`style` 为自由字符串标签（`cel`/`realistic`/`anime`…），仅用于分类展示，不影响渲染。画风由底图与精灵皮肤本身决定。
+
+## 精灵皮肤（可选，B 档）
+
+`sprites.koi` / `sprites.silvercarp` 为 `assets` store 键（id 由 `skinAssetId()` 生成，即 `skin-{packId}-{species}`），指向一张**透明背景、俯视平直、鼻朝右**的鱼贴图。渲染时经 `art/skin.ts` `normalizeSkin()` 裁切并铺满鱼体单元格，再由既有脊线切片管线（`renderer.ts` `fish()`）沿脊线逐列采样变形；侧向光照宽度由贴图 alpha 实测（`skinWidths()`）。同 species 共享一张皮肤。缺省则用程序化锦鲤（`art/koi.ts`）。
+
+皮肤用 `SKIN_PROMPT` 单独生成，与底图 JSON 解耦：导入面板解析出包后**恒定**列出锦鲤/银鲩两个可选皮肤输入（不依赖 JSON 是否声明 `sprites`），用户选了哪张，`importPack()` 就绑定哪张并写出 `sprites` 字段。
