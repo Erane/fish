@@ -1,13 +1,17 @@
 import { BODY, clamp, fishPalette, fishPose, TAU } from "../core/index.ts";
-import type { Fish, Food, Settings, Weather } from "../core/types.ts";
+import type { Fish, Food, Obstacle, Settings, Weather } from "../core/types.ts";
 import { FISH_PPU } from "../render/batch.ts";
 import type { BodyLight, Look, Renderer, Vec2, Vec3, Vec4 } from "../render/types.ts";
+import type { BedShape } from "../render/bedShapes.ts";
 import { hexToRgb01 } from "../style.ts";
 import { PALETTES } from "../core/palette.ts";
 import { fishSprite, girthOf, halfWidth } from "../art/koi.ts";
 import { absorption, lerpLook, lookFor } from "./look.ts";
 import { moonPhase } from "./moon.ts";
 import type { MoonPhase } from "./moon.ts";
+import { Floaters } from "./floaters.ts";
+import type { FloaterEnv } from "./floaters.ts";
+import { Creatures } from "./creatures.ts";
 
 interface Entry {
   cell: number;
@@ -49,6 +53,7 @@ export interface SimView {
   allFish: Fish[];
   food: Food[];
   scale: number;
+  obstacles: Obstacle[];
 }
 
 export class PondScene {
@@ -72,6 +77,17 @@ export class PondScene {
   private moonAt: Vec2 = [0, 0];
   private phase: MoonPhase;
   private phaseAt = 0;
+  private readonly floaters: Floaters;
+  private readonly creatures: Creatures;
+  private fenv: FloaterEnv = {
+    weather: "sunny",
+    rainK: 0,
+    calm: false,
+    scale: 1,
+    w: 1,
+    h: 1,
+    time: 0,
+  };
   look: Look;
   onLightning: ((strength: number) => void) | null = null;
   w = 1;
@@ -79,7 +95,7 @@ export class PondScene {
   scale = 1;
   time = 0;
 
-  constructor(R: Renderer, sim: SimView) {
+  constructor(R: Renderer, sim: SimView, shapes: BedShape[], bedW: number, bedH: number) {
     this.R = R;
     this.sim = sim;
     this.pose = new Float32Array((BODY.segments + 1) * 4);
@@ -90,6 +106,10 @@ export class PondScene {
     this.calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
     this.phase = moonPhase();
     this.look = lookFor("sunny", false);
+    this.floaters = new Floaters(R, shapes, bedW, bedH, (x, y, s, leaf) =>
+      this.splash(x, y, s, leaf),
+    );
+    this.creatures = new Creatures(R, shapes, bedW, bedH, (x, y, r, s) => this.stir(x, y, r, s));
   }
 
   layout(w: number, h: number): void {
@@ -101,6 +121,8 @@ export class PondScene {
     const span = Math.max(w, h);
     const sail = this.calm ? 0 : 1;
     this.cloudWind = [0.021 * span * sail, -0.007 * span * sail];
+    this.floaters.layout(w, h);
+    this.sim.obstacles = this.creatures.layout(w, h, this.scale);
     this.applyRuntime();
   }
 
@@ -120,6 +142,15 @@ export class PondScene {
 
   drop(x: number, y: number, r: number, s: number): void {
     this.R.drop(x, y, r, s);
+    this.floaters.pushPetals(x, y, r, s);
+  }
+
+  startle(x: number, y: number): void {
+    this.creatures.startle(x, y);
+  }
+
+  private stir(x: number, y: number, r: number, s: number): void {
+    if (!this.calm) this.drop(x, y, r, s);
   }
 
   forget(f: Fish): void {
@@ -173,11 +204,11 @@ export class PondScene {
     return down * (1 - k + k * (0.35 + 0.65 * this.R.depthAt(x, y)));
   }
 
-  private splash(x: number, y: number, s: number): void {
+  private splash(x: number, y: number, s: number, leaf = false): void {
     if (this.splashes.length > 260) return;
     const k = this.scale * s;
-    this.splashes.push({ x, y, vx: 0, vy: 0, s: k, age: 0, life: 0.38, ring: true });
-    for (let i = 2 + Math.floor(Math.random() * 3); i > 0; i--) {
+    this.splashes.push({ x, y, vx: 0, vy: 0, s: k, age: 0, life: leaf ? 0.3 : 0.38, ring: true });
+    for (let i = 2 + Math.floor(Math.random() * (leaf ? 4 : 3)); i > 0; i--) {
       const a = Math.random() * TAU;
       const v = (28 + Math.random() * 52) * k;
       this.splashes.push({
@@ -346,6 +377,10 @@ export class PondScene {
         } else this.wakes.set(f, t);
       }
     }
+
+    this.fenv = { weather, rainK, calm: this.calm, scale, w, h, time: this.time };
+    this.floaters.update(dt, this.fenv);
+    this.creatures.update(dt, settings, this.time);
   }
 
   private koi(f: Fish, cell: number, col: number): void {
@@ -521,7 +556,7 @@ export class PondScene {
     }
   }
 
-  draw(): void {
+  draw(settings: Settings): void {
     const { w, h } = this;
     const look = this.look;
     const lit: Vec3 = [
@@ -529,12 +564,24 @@ export class PondScene {
       look.bright * look.tint[1],
       look.bright * look.tint[2],
     ];
-    const items = this.sim.allFish
-      .map((f, i) => ({ d: this.column(f.x * w, f.y * h, f.depth ?? 0.5), f, i }))
-      .filter((it) => this.entry(it.f)?.ready && it.f.spine);
+    const items: { d: number; run: () => void }[] = [];
+    this.sim.allFish.forEach((f, i) => {
+      if (!(this.entry(f)?.ready && f.spine)) return;
+      const d = this.column(f.x * w, f.y * h, f.depth ?? 0.5);
+      items.push({ d, run: () => this.koi(f, i, d) });
+    });
+    if (settings.turtles)
+      for (const t of this.creatures.turtles) {
+        const d = this.column(t.x * w, t.y * h, t.depth) + 0.02;
+        items.push({ d, run: () => this.creatures.drawTurtle(t, d, look) });
+      }
     items.sort((a, b) => b.d - a.d);
-    for (const it of items) this.koi(it.f, it.i, it.d);
+    for (const it of items) it.run();
+    this.floaters.draw(this.fenv, look);
+    this.floaters.drawPetals(this.scale, look);
     this.drawFood(lit);
+    this.creatures.drawSurface(look);
     this.drawWeather(lit);
+    this.creatures.drawAir(look);
   }
 }

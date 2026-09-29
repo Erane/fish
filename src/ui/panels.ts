@@ -248,6 +248,21 @@ export function renderSettings(content: HTMLElement, ctx: PanelCtx): void {
       toggle(s.names, "显示名字", (v) => ctx.store.set("names", v)),
     ),
     controlRow(
+      "乌龟",
+      "浮沉换气，悠游于池底",
+      toggle(s.turtles, "乌龟", (v) => ctx.store.set("turtles", v)),
+    ),
+    controlRow(
+      "螃蟹",
+      "栖于石上，受惊则潜入水中",
+      toggle(s.crabs, "螃蟹", (v) => ctx.store.set("crabs", v)),
+    ),
+    controlRow(
+      "蝶与蜓",
+      "白日蝴蝶蜻蜓，入夜化作流萤",
+      toggle(s.butterflies, "蝶与蜓", (v) => ctx.store.set("butterflies", v)),
+    ),
+    controlRow(
       "画面品质",
       "节能模式限制至 30 帧",
       select(s.quality, QUALITIES, "画面品质", (v) => ctx.store.set("quality", v)),

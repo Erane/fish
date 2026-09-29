@@ -171,6 +171,7 @@ export class Shell {
 
   feedAt(x: number, y: number): void {
     const scale = this.scene.scale;
+    this.scene.startle(x, y);
     if (!this.feedMode) {
       this.scene.drop(x, y, 9 * scale, 0.9);
       this.sim.scare(x, y, 170 * scale);

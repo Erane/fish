@@ -111,7 +111,7 @@ function frame(now: number): void {
   }
   scene.setLook(settings.weather, settings.night, dt, settings.rainAmount, settings.snowAmount);
   scene.update(dt, settings);
-  scene.draw();
+  scene.draw(settings);
   renderer.render(time, dt, scene.look);
   drawLabels();
 }
@@ -149,7 +149,7 @@ async function boot(): Promise<void> {
     app.textContent = "当前浏览器无法绘制池塘";
     return;
   }
-  scene = new PondScene(renderer, sim);
+  scene = new PondScene(renderer, sim, shapes, bedW, bedH);
   scene.onLightning = (k) => audio?.thunderAfter(0.4 + Math.random() * 2.2, k);
   shell = new Shell(app, sim, scene, persister, store, audio, weatherSync);
   shell.bind(canvas);
