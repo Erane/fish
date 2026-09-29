@@ -319,6 +319,16 @@ export function renderSettings(content: HTMLElement, ctx: PanelCtx): void {
       select(s.quality, QUALITIES, "画面品质", (v) => ctx.store.set("quality", v)),
     ),
     controlRow(
+      "焦散反光",
+      "水下晃动的网状光纹",
+      toggle(s.caustic, "焦散反光", (v) => ctx.store.set("caustic", v)),
+    ),
+    controlRow(
+      "焦散强度",
+      "",
+      slider(s.causticAmount, 0, 1, 0.05, "焦散强度", (v) => ctx.store.set("causticAmount", v)),
+    ),
+    controlRow(
       "主音量",
       "",
       slider(s.volume, 0, 1, 0.05, "主音量", (v) => ctx.store.set("volume", v)),

@@ -119,6 +119,8 @@ export interface Settings {
   autoWeather: boolean;
   location: GeoLocation | null;
   night: boolean;
+  caustic: boolean;
+  causticAmount: number;
   water: boolean;
   waterType: WaterType;
   waterVol: number;

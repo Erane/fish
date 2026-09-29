@@ -29,6 +29,7 @@ const BOOL_KEYS = [
   "names",
   "autoWeather",
   "night",
+  "caustic",
   "water",
   "weatherSound",
   "sfx",
@@ -40,6 +41,7 @@ const UNIT_KEYS = [
   "volume",
   "rainAmount",
   "snowAmount",
+  "causticAmount",
 ] as const;
 
 function sanitizeSettings(raw: unknown): Partial<Settings> {

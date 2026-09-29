@@ -12,6 +12,8 @@ export const DEFAULT_SETTINGS: Settings = {
   autoWeather: false,
   location: null,
   night: false,
+  caustic: true,
+  causticAmount: 1,
   water: true,
   waterType: "stream",
   waterVol: 0.6,

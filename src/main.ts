@@ -134,7 +134,14 @@ function frame(now: number): void {
     persister?.schedule();
     shell?.noteEaten();
   }
-  scene.setLook(settings.weather, settings.night, dt, settings.rainAmount, settings.snowAmount);
+  scene.setLook(
+    settings.weather,
+    settings.night,
+    dt,
+    settings.rainAmount,
+    settings.snowAmount,
+    settings.caustic ? settings.causticAmount : 0,
+  );
   scene.update(dt, settings);
   scene.draw(settings);
   renderer.render(time, dt, scene.look);
@@ -203,7 +210,14 @@ async function boot(): Promise<void> {
   shell.bind(canvas);
   addEventListener("resize", resize);
   resize();
-  scene.setLook(settings.weather, settings.night, 0, settings.rainAmount, settings.snowAmount);
+  scene.setLook(
+    settings.weather,
+    settings.night,
+    0,
+    settings.rainAmount,
+    settings.snowAmount,
+    settings.caustic ? settings.causticAmount : 0,
+  );
   scene.update(0, settings);
   requestAnimationFrame(frame);
 }

@@ -508,16 +508,18 @@ export function createRenderer(
     } else drops.length = 0;
 
     gl.disable(gl.BLEND);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, state.caustic!.fb);
-    gl.viewport(0, 0, state.caustic!.w, state.caustic!.h);
     let p = P.caustic;
-    gl.useProgram(p.p);
-    gl.uniform1f(p.u("uTime"), time);
-    gl.uniform1f(p.u("uCell"), env.causticCell);
-    gl.uniform2f(p.u("uView"), w, h);
-    bindTex(0, noiseTex);
-    gl.uniform1i(p.u("uNoise"), 0);
-    drawQuad();
+    if (env.caustic > 0) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, state.caustic!.fb);
+      gl.viewport(0, 0, state.caustic!.w, state.caustic!.h);
+      gl.useProgram(p.p);
+      gl.uniform1f(p.u("uTime"), time);
+      gl.uniform1f(p.u("uCell"), env.causticCell);
+      gl.uniform2f(p.u("uView"), w, h);
+      bindTex(0, noiseTex);
+      gl.uniform1i(p.u("uNoise"), 0);
+      drawQuad();
+    }
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, state.cloud!.fb);
     gl.viewport(0, 0, state.cloud!.w, state.cloud!.h);

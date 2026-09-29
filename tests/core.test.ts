@@ -184,6 +184,8 @@ describe("sanitizeSave", () => {
         speed: 9,
         volume: 3,
         rainAmount: -1,
+        caustic: "yes",
+        causticAmount: -1,
         night: true,
         turtles: "yes",
         music: "guqin",
@@ -197,6 +199,8 @@ describe("sanitizeSave", () => {
     expect(saved.settings.speed).toBe(2);
     expect(saved.settings.volume).toBe(1);
     expect(saved.settings.rainAmount).toBe(0);
+    expect(saved.settings.caustic).toBeUndefined();
+    expect(saved.settings.causticAmount).toBe(0);
     expect(saved.settings.night).toBe(true);
     expect(saved.settings.turtles).toBeUndefined();
     expect(saved.settings.music).toBe("guqin");
@@ -212,6 +216,15 @@ describe("sanitizeSave", () => {
   it("极致档作为合法画质取值可往返", () => {
     const saved = sanitizeSave({ fish: [{ name: "小满" }], settings: { quality: "ultra" } })!;
     expect(saved.settings.quality).toBe("ultra");
+  });
+
+  it("焦散开关与强度合法取值可往返", () => {
+    const saved = sanitizeSave({
+      fish: [{ name: "小满" }],
+      settings: { caustic: false, causticAmount: 0.5 },
+    })!;
+    expect(saved.settings.caustic).toBe(false);
+    expect(saved.settings.causticAmount).toBe(0.5);
   });
 });
 

@@ -143,8 +143,9 @@ export class PondScene {
     this.seasonTint = hex ? hexToRgb01(hex) : null;
   }
 
-  setLook(weather: Weather, night: boolean, dt: number, rain = 0.5, snow = 0.5): void {
+  setLook(weather: Weather, night: boolean, dt: number, rain = 0.5, snow = 0.5, caustic = 1): void {
     const target = lookFor(weather, night, rain, snow);
+    target.caustic *= caustic;
     if (this.seasonTint) {
       const t = this.seasonTint;
       target.water = [
