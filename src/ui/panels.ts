@@ -28,6 +28,7 @@ const WEATHERS: [Weather, string][] = [
 ];
 
 const QUALITIES: [Quality, string][] = [
+  ["ultra", "极致 · 原生分辨率"],
   ["high", "细腻 · 60 帧"],
   ["eco", "节能 · 30 帧"],
 ];

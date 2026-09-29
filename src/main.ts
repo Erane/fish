@@ -13,6 +13,7 @@ import { generateBed } from "./render/bedShapes.ts";
 import { bedDepth, floatMask, paintBed } from "./render/bedPaint.ts";
 import { buildSprites } from "./art/sprites.ts";
 import { createRenderer } from "./render/renderer.ts";
+import { QUALITY_SPEC, tierDpr } from "./render/quality.ts";
 import type { Renderer } from "./render/types.ts";
 import { PondScene } from "./scene/scene.ts";
 import { PondAudio } from "./audio/pondAudio.ts";
@@ -50,13 +51,15 @@ let persister: Persister | null = null;
 let shell: Shell | null = null;
 let audio: PondAudio | null = null;
 let dpr = 1;
+let labelDpr = 1;
 
 function resize(): void {
   width = innerWidth;
   height = innerHeight;
-  dpr = settings.quality === "eco" ? 1 : Math.max(1, Math.min(devicePixelRatio || 1, 2));
-  labels.width = Math.round(width * dpr);
-  labels.height = Math.round(height * dpr);
+  dpr = tierDpr(settings.quality, devicePixelRatio || 1);
+  labelDpr = Math.min(dpr, 2);
+  labels.width = Math.round(width * labelDpr);
+  labels.height = Math.round(height * labelDpr);
   if (sim) {
     sim.width = width;
     sim.height = height;
@@ -77,7 +80,7 @@ function drawLabels(): void {
     return;
   }
   labelsOn = true;
-  labelCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  labelCtx.setTransform(labelDpr, 0, 0, labelDpr, 0, 0);
   labelCtx.clearRect(0, 0, width, height);
   labelCtx.font = '11px "LXGW WenKai","STKaiti","KaiTi",serif';
   labelCtx.textAlign = "center";
@@ -94,12 +97,16 @@ function drawLabels(): void {
 }
 
 let last = 0;
+let lastRender = 0;
 let time = 0;
 let eaten = 0;
 function frame(now: number): void {
   requestAnimationFrame(frame);
+  const hz = QUALITY_SPEC[settings.quality].frameHz;
+  if (lastRender && now - lastRender < 1000 / hz - 1) return;
   const dt = last ? Math.min((now - last) / 1000, 0.05) : 0.016;
   last = now;
+  lastRender = now;
   time += dt;
   if (!sim || !renderer || !scene) return;
   sim.step(dt, settings.speed);

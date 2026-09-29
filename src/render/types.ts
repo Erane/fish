@@ -1,3 +1,5 @@
+import type { Quality } from "../core/types.ts";
+
 export type Vec2 = [number, number];
 export type Vec3 = [number, number, number];
 export type Vec4 = [number, number, number, number];
@@ -84,7 +86,7 @@ export interface Renderer {
   readonly ripples: boolean;
   readonly sprites: SpriteSet;
   readonly canvas: HTMLCanvasElement;
-  resize(w: number, h: number, dpr: number, quality: "high" | "eco"): void;
+  resize(w: number, h: number, dpr: number, quality: Quality): void;
   imageToScreen(x: number, y: number): [number, number];
   setFish(i: number, sprite: HTMLCanvasElement): void;
   render(time: number, dt: number, env: Look): void;

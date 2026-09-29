@@ -96,7 +96,8 @@ export interface DepthField {
 }
 
 export type Weather = "sunny" | "cloudy" | "rain" | "snow";
-export type Quality = "high" | "eco";
+export const QUALITIES = ["ultra", "high", "eco"] as const;
+export type Quality = (typeof QUALITIES)[number];
 export type WaterType = "stream" | "spring" | "cascade" | "lapping" | "bamboo";
 export type Music = "guqin" | "bowl" | "chimes" | "off";
 

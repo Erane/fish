@@ -1,5 +1,6 @@
 import { BODY, DEEP_TINT } from "../core/index.ts";
 import type { DepthField } from "../core/index.ts";
+import type { Quality } from "../core/types.ts";
 import { TOKENS, hexToRgb01 } from "../style.ts";
 import {
   ATLAS,
@@ -16,6 +17,7 @@ import {
 } from "./batch.ts";
 import { bedToScreen, depthAtScreen, fitBed } from "./bed.ts";
 import type { BedTransform } from "./bed.ts";
+import { renderSizes } from "./quality.ts";
 import {
   FS_BED,
   FS_CAUSTIC,
@@ -61,7 +63,7 @@ interface State {
   w: number;
   h: number;
   dpr: number;
-  quality: "high" | "eco";
+  quality: Quality;
   scene: Target | null;
   shadow: Target | null;
   caustic: Target | null;
@@ -323,53 +325,30 @@ export function createRenderer(
   const batches = {} as Record<Layer, Batch>;
   for (const l of LAYERS) batches[l] = new Batch();
 
-  function resize(w: number, h: number, dpr: number, quality: "high" | "eco"): void {
+  function resize(w: number, h: number, dpr: number, quality: Quality): void {
     state.w = w;
     state.h = h;
     state.dpr = dpr;
     state.quality = quality;
-    const px = w * h * dpr * dpr;
-    const cap = quality === "eco" ? 1.6e6 : 3.6e6;
-    const k = px > cap ? Math.sqrt(cap / px) : 1;
-    canvas.width = Math.max(1, Math.round(w * dpr * k));
-    canvas.height = Math.max(1, Math.round(h * dpr * k));
+    const sz = renderSizes(w, h, dpr, quality);
+    canvas.width = sz.cw;
+    canvas.height = sz.ch;
     freeTarget(state.scene);
     freeTarget(state.shadow);
     freeTarget(state.caustic);
     freeTarget(state.surface);
     freeTarget(state.cloud);
     state.sim.forEach(freeTarget);
-    state.scene = target(canvas.width, canvas.height, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE);
-    const sd = quality === "eco" ? 3 : 2;
-    state.shadow = target(
-      Math.ceil(w / sd),
-      Math.ceil(h / sd),
-      gl.RGBA8,
-      gl.RGBA,
-      gl.UNSIGNED_BYTE,
-    );
+    state.scene = target(sz.cw, sz.ch, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE);
+    state.shadow = target(sz.shadow[0], sz.shadow[1], gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE);
     gl.bindTexture(gl.TEXTURE_2D, state.shadow!.tex);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
     gl.generateMipmap(gl.TEXTURE_2D);
-    state.cloud = target(Math.ceil(w / 8), Math.ceil(h / 8), gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE);
-    const cd = quality === "eco" ? 3 : 2;
-    state.caustic = target(
-      Math.ceil(w / cd),
-      Math.ceil(h / cd),
-      gl.RGBA8,
-      gl.RGBA,
-      gl.UNSIGNED_BYTE,
-    );
-    state.surface = target(
-      Math.ceil(w / cd),
-      Math.ceil(h / cd),
-      gl.RGBA8,
-      gl.RGBA,
-      gl.UNSIGNED_BYTE,
-    );
-    const cell = quality === "eco" ? 4 : 3;
-    state.simW = Math.min(900, Math.ceil(w / cell));
-    state.simH = Math.min(900, Math.ceil(h / cell));
+    state.cloud = target(sz.cloud[0], sz.cloud[1], gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE);
+    state.caustic = target(sz.caustic[0], sz.caustic[1], gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE);
+    state.surface = target(sz.surface[0], sz.surface[1], gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE);
+    state.simW = sz.sim[0];
+    state.simH = sz.sim[1];
     state.sim = floatRT
       ? ([0, 1].map(() =>
           target(state.simW, state.simH, gl.RGBA16F, gl.RGBA, gl.HALF_FLOAT),

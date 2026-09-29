@@ -180,7 +180,7 @@ describe("sanitizeSave", () => {
       fish: [{ name: "小满" }],
       settings: {
         weather: "rain",
-        quality: "ultra",
+        quality: "cinematic",
         speed: 9,
         volume: 3,
         rainAmount: -1,
@@ -207,6 +207,11 @@ describe("sanitizeSave", () => {
       longitude: 120.1,
     });
     expect("bogus" in saved.settings).toBe(false);
+  });
+
+  it("极致档作为合法画质取值可往返", () => {
+    const saved = sanitizeSave({ fish: [{ name: "小满" }], settings: { quality: "ultra" } })!;
+    expect(saved.settings.quality).toBe("ultra");
   });
 });
 

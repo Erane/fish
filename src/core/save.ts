@@ -1,6 +1,7 @@
 import { createFish } from "./fish.ts";
 import { clamp, randomSeed } from "./math.ts";
 import { PALETTES } from "./palette.ts";
+import { QUALITIES } from "./types.ts";
 import type {
   DailyCount,
   FishMark,
@@ -17,7 +18,7 @@ export function cleanKoiName(raw: string): string {
 }
 
 const WEATHER = ["sunny", "cloudy", "rain", "snow"];
-const QUALITY = ["high", "eco"];
+const QUALITY: readonly string[] = QUALITIES;
 const WATER_TYPE = ["stream", "spring", "cascade", "lapping", "bamboo"];
 const MUSIC = ["guqin", "bowl", "chimes", "off"];
 const BOOL_KEYS = [
