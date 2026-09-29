@@ -22,17 +22,20 @@ export class Store {
   private readonly sim: PondSimulation;
   private readonly sink: PersistSink;
   private readonly applyQuality: () => void;
+  private readonly applyAudio: () => void;
 
   constructor(
     sim: PondSimulation,
     settings: Settings,
     sink: PersistSink,
     applyQuality: () => void,
+    applyAudio: () => void,
   ) {
     this.sim = sim;
     this.settings = settings;
     this.sink = sink;
     this.applyQuality = applyQuality;
+    this.applyAudio = applyAudio;
   }
 
   get fish(): Fish[] {
@@ -43,6 +46,7 @@ export class Store {
     this.settings[key] = value;
     if (key === "silverCarp") this.sim.residentsOn = value as boolean;
     if (key === "quality") this.applyQuality();
+    this.applyAudio();
     this.sink.schedule();
   }
 

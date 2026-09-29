@@ -73,6 +73,7 @@ export class PondScene {
   private phase: MoonPhase;
   private phaseAt = 0;
   look: Look;
+  onLightning: ((strength: number) => void) | null = null;
   w = 1;
   h = 1;
   scale = 1;
@@ -278,6 +279,7 @@ export class PondScene {
         this.bolts.push([t0, k], [t0 + 0.09 + Math.random() * 0.06, k * 0.45]);
         if (Math.random() < 0.6) this.bolts.push([t0 + 0.28 + Math.random() * 0.25, k * 0.75]);
         this.nextBolt = 22 + Math.random() * 48;
+        this.onLightning?.(k);
       }
     } else this.nextBolt = Math.max(this.nextBolt, 8 + Math.random() * 12);
     let flash = 0;

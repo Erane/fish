@@ -10,6 +10,7 @@ function makeStore(fishCount = 3): {
   settings: Settings;
   sink: PersistSink & { calls: number };
   qualityRuns: { n: number };
+  audioRuns: { n: number };
 } {
   const random = randomSeed(11);
   const fish = Array.from({ length: fishCount }, (_, i) => createFish(i, random));
@@ -20,10 +21,19 @@ function makeStore(fishCount = 3): {
     sink.calls += 1;
   };
   const qualityRuns = { n: 0 };
-  const store = new Store(sim, settings, sink, () => {
-    qualityRuns.n += 1;
-  });
-  return { store, sim, settings, sink, qualityRuns };
+  const audioRuns = { n: 0 };
+  const store = new Store(
+    sim,
+    settings,
+    sink,
+    () => {
+      qualityRuns.n += 1;
+    },
+    () => {
+      audioRuns.n += 1;
+    },
+  );
+  return { store, sim, settings, sink, qualityRuns, audioRuns };
 }
 
 describe("Store.set", () => {
@@ -46,6 +56,13 @@ describe("Store.set", () => {
     const { store, qualityRuns } = makeStore();
     store.set("quality", "eco");
     expect(qualityRuns.n).toBe(1);
+  });
+
+  it("任何设置变更都会同步到音频", () => {
+    const { store, audioRuns } = makeStore();
+    store.set("volume", 0.4);
+    store.set("weather", "rain");
+    expect(audioRuns.n).toBe(2);
   });
 });
 

@@ -1,6 +1,7 @@
 import type { PondSimulation } from "../core/simulation.ts";
 import type { Persister } from "../data/persist.ts";
 import type { PondScene } from "../scene/scene.ts";
+import type { PondAudio } from "../audio/pondAudio.ts";
 import { TOKENS } from "../style.ts";
 import type { Store } from "./store.ts";
 import { elem } from "./dom.ts";
@@ -22,6 +23,7 @@ export class Shell {
   private active: PanelKind | null = null;
   private readonly bar: HTMLDivElement;
   private readonly feedButton: HTMLButtonElement;
+  private readonly soundButton: HTMLButtonElement;
   private readonly dialog: HTMLDialogElement;
   private readonly title: HTMLHeadingElement;
   private readonly content: HTMLDivElement;
@@ -33,6 +35,7 @@ export class Shell {
   private readonly sim: PondSimulation;
   private readonly scene: PondScene;
   private readonly persister: Persister;
+  private readonly audio: PondAudio;
   private readonly ctx: PanelCtx;
 
   constructor(
@@ -41,11 +44,13 @@ export class Shell {
     scene: PondScene,
     persister: Persister,
     store: Store,
+    audio: PondAudio,
   ) {
     this.root = root;
     this.sim = sim;
     this.scene = scene;
     this.persister = persister;
+    this.audio = audio;
 
     this.feedButton = elem("button", {
       type: "button",
@@ -72,7 +77,12 @@ export class Shell {
       text: "沉浸",
       onclick: () => this.setZen(true),
     });
-    this.bar.append(zenButton);
+    this.soundButton = elem("button", {
+      type: "button",
+      onclick: () => void this.toggleSound(),
+    });
+    this.bar.append(zenButton, this.soundButton);
+    this.setSound(false);
 
     this.title = elem("h2");
     this.content = elem("div", { class: "panel-content" });
@@ -144,11 +154,24 @@ export class Shell {
     this.toast(this.feedMode ? "投喂已开启，轻点水面试试" : "观鱼模式 · 轻点水面，鱼儿会受惊游开");
   }
 
+  private setSound(on: boolean): void {
+    this.soundButton.textContent = on ? "声音" : "静音";
+    this.soundButton.classList.toggle("active", on);
+    this.soundButton.setAttribute("aria-pressed", String(on));
+  }
+
+  private async toggleSound(): Promise<void> {
+    const on = await this.audio.toggle();
+    this.setSound(on);
+    this.toast(on ? "水声与禅乐已开启" : "已静音");
+  }
+
   feedAt(x: number, y: number): void {
     const scale = this.scene.scale;
     if (!this.feedMode) {
       this.scene.drop(x, y, 9 * scale, 0.9);
       this.sim.scare(x, y, 170 * scale);
+      this.audio.tap();
       return;
     }
     this.scene.drop(x, y, 7 * scale, 0.5);
@@ -158,6 +181,7 @@ export class Shell {
       return;
     }
     for (const p of this.sim.food.slice(before)) this.scene.drop(p.x, p.y, 3 * scale, 0.22);
+    this.audio.plop();
     this.persister.bumpFeed();
   }
 

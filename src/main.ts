@@ -15,6 +15,7 @@ import { buildSprites } from "./art/sprites.ts";
 import { createRenderer } from "./render/renderer.ts";
 import type { Renderer } from "./render/types.ts";
 import { PondScene } from "./scene/scene.ts";
+import { PondAudio } from "./audio/pondAudio.ts";
 import { loadSave } from "./data/db.ts";
 import { dayKey, Persister } from "./data/persist.ts";
 import { Store } from "./ui/store.ts";
@@ -43,6 +44,7 @@ let scene: PondScene | null = null;
 let sim: PondSimulation | null = null;
 let persister: Persister | null = null;
 let shell: Shell | null = null;
+let audio: PondAudio | null = null;
 
 function resize(): void {
   width = innerWidth;
@@ -69,6 +71,7 @@ function frame(now: number): void {
   sim.step(dt, settings.speed);
   if (sim.totalEaten !== eaten) {
     eaten = sim.totalEaten;
+    audio?.gulp();
     persister?.schedule();
     shell?.noteEaten();
   }
@@ -94,7 +97,9 @@ async function boot(): Promise<void> {
   );
   persister = new Persister(sim, settings);
   if (saved?.daily?.date === dayKey()) persister.daily = saved.daily;
-  const store = new Store(sim, settings, persister, resize);
+  audio = new PondAudio();
+  audio.configure(settings);
+  const store = new Store(sim, settings, persister, resize, () => audio?.configure(settings));
 
   renderer = createRenderer(canvas, bedCanvas, buildSprites(), mask, depth, () => {
     location.reload();
@@ -104,7 +109,8 @@ async function boot(): Promise<void> {
     return;
   }
   scene = new PondScene(renderer, sim);
-  shell = new Shell(app, sim, scene, persister, store);
+  scene.onLightning = (k) => audio?.thunderAfter(0.4 + Math.random() * 2.2, k);
+  shell = new Shell(app, sim, scene, persister, store, audio);
   shell.bind(canvas);
   addEventListener("resize", resize);
   resize();

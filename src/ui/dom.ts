@@ -56,3 +56,19 @@ export function toggle(
     onchange: (e) => onChange((e.target as HTMLInputElement).checked),
   });
 }
+
+export function select<T extends string>(
+  value: T,
+  options: readonly (readonly [T, string])[],
+  label: string,
+  onChange: (value: T) => void,
+): HTMLSelectElement {
+  return elem(
+    "select",
+    {
+      "aria-label": label,
+      onchange: (e) => onChange((e.target as HTMLSelectElement).value as T),
+    },
+    ...options.map(([v, text]) => elem("option", { value: v, text, selected: v === value })),
+  );
+}

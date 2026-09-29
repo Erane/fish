@@ -1,13 +1,13 @@
 import { PALETTES } from "../core/palette.ts";
 import { BODY } from "../core/fish.ts";
-import type { Fish, Quality, Weather } from "../core/types.ts";
+import type { Fish, Music, Quality, WaterType, Weather } from "../core/types.ts";
 import type { PondSimulation } from "../core/simulation.ts";
 import type { Persister } from "../data/persist.ts";
 import type { PondScene } from "../scene/scene.ts";
 import { fishSprite } from "../art/koi.ts";
 import type { Store } from "./store.ts";
 import { KOI_LIMIT } from "./store.ts";
-import { controlRow, elem, slider, toggle } from "./dom.ts";
+import { controlRow, elem, select, slider, toggle } from "./dom.ts";
 
 export interface PanelCtx {
   store: Store;
@@ -23,6 +23,26 @@ const WEATHERS: [Weather, string][] = [
   ["cloudy", "多云"],
   ["rain", "下雨"],
   ["snow", "落雪"],
+];
+
+const QUALITIES: [Quality, string][] = [
+  ["high", "细腻 · 60 帧"],
+  ["eco", "节能 · 30 帧"],
+];
+
+const WATERS: [WaterType, string][] = [
+  ["stream", "溪流"],
+  ["spring", "山泉"],
+  ["cascade", "叠石"],
+  ["lapping", "静池"],
+  ["bamboo", "竹筒惊鹿"],
+];
+
+const MUSICS: [Music, string][] = [
+  ["guqin", "古琴"],
+  ["bowl", "颂钵"],
+  ["chimes", "风铃"],
+  ["off", "无"],
 ];
 
 function thumbnail(f: Fish, ppu = 1.6): HTMLCanvasElement {
@@ -108,15 +128,6 @@ export function renderWeather(content: HTMLElement, ctx: PanelCtx): void {
 
 export function renderSettings(content: HTMLElement, ctx: PanelCtx): void {
   const s = ctx.store.settings;
-  const quality = elem(
-    "select",
-    {
-      "aria-label": "画面品质",
-      onchange: (e) => ctx.store.set("quality", (e.target as HTMLSelectElement).value as Quality),
-    },
-    elem("option", { value: "high", text: "细腻 · 60 帧", selected: s.quality === "high" }),
-    elem("option", { value: "eco", text: "节能 · 30 帧", selected: s.quality === "eco" }),
-  );
   content.replaceChildren(
     controlRow(
       "游动速度",
@@ -128,7 +139,56 @@ export function renderSettings(content: HTMLElement, ctx: PanelCtx): void {
       "银鳞结伴，穿梭于锦鲤之间",
       toggle(s.silverCarp, "青鲢鱼", (v) => ctx.store.set("silverCarp", v)),
     ),
-    controlRow("画面品质", "节能模式限制至 30 帧", quality),
+    controlRow(
+      "画面品质",
+      "节能模式限制至 30 帧",
+      select(s.quality, QUALITIES, "画面品质", (v) => ctx.store.set("quality", v)),
+    ),
+    controlRow(
+      "主音量",
+      "",
+      slider(s.volume, 0, 1, 0.05, "主音量", (v) => ctx.store.set("volume", v)),
+    ),
+    controlRow(
+      "水声",
+      "溪流、山泉、叠石或静池",
+      toggle(s.water, "水声", (v) => ctx.store.set("water", v)),
+    ),
+    controlRow(
+      "水声类型",
+      "",
+      select(s.waterType, WATERS, "水声类型", (v) => ctx.store.set("waterType", v)),
+    ),
+    controlRow(
+      "水声音量",
+      "",
+      slider(s.waterVol, 0, 1, 0.05, "水声音量", (v) => ctx.store.set("waterVol", v)),
+    ),
+    controlRow(
+      "天气音",
+      "雨滴、鸟鸣、蛙声与远雷",
+      toggle(s.weatherSound, "天气音", (v) => ctx.store.set("weatherSound", v)),
+    ),
+    controlRow(
+      "天气音量",
+      "",
+      slider(s.weatherVol, 0, 1, 0.05, "天气音量", (v) => ctx.store.set("weatherVol", v)),
+    ),
+    controlRow(
+      "禅乐",
+      "古琴、颂钵或风铃",
+      select(s.music, MUSICS, "禅乐", (v) => ctx.store.set("music", v)),
+    ),
+    controlRow(
+      "禅乐音量",
+      "",
+      slider(s.musicVol, 0, 1, 0.05, "禅乐音量", (v) => ctx.store.set("musicVol", v)),
+    ),
+    controlRow(
+      "音效",
+      "投喂、进食与点水的声音",
+      toggle(s.sfx, "音效", (v) => ctx.store.set("sfx", v)),
+    ),
     elem(
       "div",
       { class: "form-actions" },
