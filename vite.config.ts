@@ -10,8 +10,8 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       manifest: {
-        name: "碧池观鱼",
-        short_name: "碧池观鱼",
+        name: "知鱼",
+        short_name: "知鱼",
         description: "可交互的锦鲤池塘动态壁纸",
         lang: "zh-CN",
         start_url: ".",
