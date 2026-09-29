@@ -1,60 +1,114 @@
 import "./style.css";
-import heroImg from "./assets/hero.png";
-import typescriptLogo from "./assets/typescript.svg";
-import viteLogo from "./assets/vite.svg";
-import { setupCounter } from "./counter.ts";
+import {
+  clamp,
+  createFish,
+  createSilverCarpShoal,
+  DEFAULT_SETTINGS,
+  PondSimulation,
+  revive,
+  sanitizeSave,
+} from "./core/index.ts";
+import type { Settings } from "./core/types.ts";
+import { generateBed } from "./render/bedShapes.ts";
+import { bedDepth, floatMask, paintBed } from "./render/bedPaint.ts";
+import { buildSprites } from "./art/sprites.ts";
+import { createRenderer } from "./render/renderer.ts";
+import type { Renderer } from "./render/types.ts";
+import { PondScene } from "./scene/scene.ts";
+import { loadSave } from "./data/db.ts";
+import { dayKey, Persister } from "./data/persist.ts";
+import { Shell } from "./ui/shell.ts";
 
-document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
-<section id="center">
-  <div class="hero">
-    <img src="${heroImg}" class="base" width="170" height="179">
-    <img src="${typescriptLogo}" class="framework" alt="TypeScript logo"/>
-    <img src="${viteLogo}" class="vite" alt="Vite logo" />
-  </div>
-  <div>
-    <h1>Get started</h1>
-    <p>Edit <code>src/main.ts</code> and save to test <code>HMR</code></p>
-  </div>
-  <button id="counter" type="button" class="counter"></button>
-</section>
+const settings: Settings = { ...DEFAULT_SETTINGS };
 
-<div class="ticks"></div>
+const app = document.querySelector<HTMLDivElement>("#app")!;
+const canvas = document.createElement("canvas");
+canvas.id = "pond";
+app.append(canvas);
 
-<section id="next-steps">
-  <div id="docs">
-    <svg class="icon" role="presentation" aria-hidden="true"><use href="/icons.svg#documentation-icon"></use></svg>
-    <h2>Documentation</h2>
-    <p>Your questions, answered</p>
-    <ul>
-      <li>
-        <a href="https://vite.dev/" target="_blank">
-          <img class="logo" src="${viteLogo}" alt="" />
-          Explore Vite
-        </a>
-      </li>
-      <li>
-        <a href="https://www.typescriptlang.org" target="_blank">
-          <img class="button-icon" src="${typescriptLogo}" alt="">
-          Learn more
-        </a>
-      </li>
-    </ul>
-  </div>
-  <div id="social">
-    <svg class="icon" role="presentation" aria-hidden="true"><use href="/icons.svg#social-icon"></use></svg>
-    <h2>Connect with us</h2>
-    <p>Join the Vite community</p>
-    <ul>
-      <li><a href="https://github.com/vitejs/vite" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#github-icon"></use></svg>GitHub</a></li>
-      <li><a href="https://chat.vite.dev/" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#discord-icon"></use></svg>Discord</a></li>
-      <li><a href="https://x.com/vite_js" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#x-icon"></use></svg>X.com</a></li>
-      <li><a href="https://bsky.app/profile/vite.dev" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#bluesky-icon"></use></svg>Bluesky</a></li>
-    </ul>
-  </div>
-</section>
+const SEED = 7;
+const shapes = generateBed(SEED);
 
-<div class="ticks"></div>
-<section id="spacer"></section>
-`;
+let width = innerWidth;
+let height = innerHeight;
+const bedW = 1600;
+const bedH = Math.max(2, Math.round((bedW * height) / width));
+const bedCanvas = paintBed(shapes, bedW, bedH, 1);
+const mask = floatMask(shapes, bedW, bedH);
+const depth = bedDepth(shapes, bedW, bedH, SEED);
 
-setupCounter(document.querySelector<HTMLButtonElement>("#counter")!);
+let renderer: Renderer | null = null;
+let scene: PondScene | null = null;
+let sim: PondSimulation | null = null;
+let persister: Persister | null = null;
+let shell: Shell | null = null;
+
+function resize(): void {
+  width = innerWidth;
+  height = innerHeight;
+  const dpr = settings.quality === "eco" ? 1 : Math.max(1, Math.min(devicePixelRatio || 1, 2));
+  if (sim) {
+    sim.width = width;
+    sim.height = height;
+    sim.scale = clamp(Math.min(width, height) / 720, 0.66, 1.25);
+  }
+  renderer?.resize(width, height, dpr, settings.quality);
+  scene?.layout(width, height);
+}
+
+let last = 0;
+let time = 0;
+let eaten = 0;
+function frame(now: number): void {
+  requestAnimationFrame(frame);
+  const dt = last ? Math.min((now - last) / 1000, 0.05) : 0.016;
+  last = now;
+  time += dt;
+  if (!sim || !renderer || !scene) return;
+  sim.step(dt, settings.speed);
+  if (sim.totalEaten !== eaten) {
+    eaten = sim.totalEaten;
+    persister?.schedule();
+    shell?.noteEaten();
+  }
+  scene.setLook(settings.weather, settings.night, dt, settings.rainAmount, settings.snowAmount);
+  scene.update(dt, settings);
+  scene.draw();
+  renderer.render(time, dt, scene.look);
+}
+
+async function boot(): Promise<void> {
+  const saved = sanitizeSave(await loadSave());
+  if (saved) Object.assign(settings, saved.settings);
+  const fish = saved?.fish
+    ? saved.fish.map((f) => revive(f))
+    : [createFish(0), createFish(1), createFish(2), createFish(3), createFish(4)];
+  sim = new PondSimulation(
+    fish,
+    width,
+    height,
+    Math.random,
+    createSilverCarpShoal(),
+    settings.silverCarp,
+  );
+  persister = new Persister(sim, settings);
+  if (saved?.daily?.date === dayKey()) persister.daily = saved.daily;
+
+  renderer = createRenderer(canvas, bedCanvas, buildSprites(), mask, depth, () => {
+    location.reload();
+  });
+  if (!renderer) {
+    app.textContent = "当前浏览器无法绘制池塘";
+    return;
+  }
+  scene = new PondScene(renderer, sim);
+  shell = new Shell(app, sim, scene, persister);
+  shell.bind(canvas);
+  addEventListener("resize", resize);
+  resize();
+  scene.setLook(settings.weather, settings.night, 0, settings.rainAmount, settings.snowAmount);
+  scene.update(0, settings);
+  requestAnimationFrame(frame);
+}
+
+void boot();

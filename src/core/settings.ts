@@ -1,0 +1,26 @@
+import type { Settings } from "./types.ts";
+
+export const DEFAULT_SETTINGS: Settings = {
+  weather: "sunny",
+  speed: 1,
+  turtles: true,
+  crabs: true,
+  silverCarp: true,
+  butterflies: true,
+  names: false,
+  quality: "high",
+  autoWeather: false,
+  location: null,
+  night: false,
+  water: true,
+  waterType: "stream",
+  waterVol: 0.6,
+  weatherSound: true,
+  weatherVol: 0.6,
+  music: "guqin",
+  musicVol: 0.5,
+  sfx: true,
+  volume: 0.7,
+  rainAmount: 0.5,
+  snowAmount: 0.5,
+};
