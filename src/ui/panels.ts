@@ -2,16 +2,27 @@ import { PALETTES } from "../core/palette.ts";
 import { BODY } from "../core/fish.ts";
 import { parsePack } from "../core/pack.ts";
 import type { PondPack, Season } from "../core/pack.ts";
+import {
+  SKIN_NAME_MAX,
+  SKIN_SPECIES,
+  SKIN_TIERS,
+  prunePackBindings,
+  pruneSkinBindings,
+  withSkinBinding,
+} from "../core/skins.ts";
+import type { SkinSpecies, SkinTier } from "../core/skins.ts";
 import type { Fish, Music, Quality, WaterType, Weather } from "../core/types.ts";
 import type { PondSimulation } from "../core/simulation.ts";
 import type { Persister } from "../data/persist.ts";
-import { writeSave } from "../data/db.ts";
-import { importPack, listPacks, removePack } from "../data/packs.ts";
-import type { SkinSpecies } from "../data/packs.ts";
+import { writeAsset, writeSave } from "../data/db.ts";
+import { importPack, listPacks, removePack, resolvePack, seasonAssetId } from "../data/packs.ts";
+import { addSkin, editSkin, listSkins, removeSkin } from "../data/skins.ts";
+import type { SkinRecord } from "../data/skins.ts";
 import { PACK_PROMPT, SKIN_PROMPT } from "../data/packPrompt.ts";
 import type { WeatherSync } from "../data/weather.ts";
 import type { PondScene } from "../scene/scene.ts";
 import { fishSprite } from "../art/koi.ts";
+import { buildPackSkins } from "../art/skin.ts";
 import type { Store } from "./store.ts";
 import { KOI_LIMIT } from "./store.ts";
 import { confirmButton, controlRow, copyText, elem, select, slider, toggle } from "./dom.ts";
@@ -59,11 +70,6 @@ const SEASON_LABELS: Record<Season, string> = {
   summer: "夏",
   autumn: "秋",
   winter: "冬",
-};
-
-const SPECIES_LABELS: Record<SkinSpecies, string> = {
-  koi: "锦鲤皮肤",
-  silvercarp: "银鲩皮肤",
 };
 
 function seasonSummary(pack: PondPack): string {
@@ -387,8 +393,221 @@ export function renderSettings(content: HTMLElement, ctx: PanelCtx): void {
   );
 }
 
+const SPECIES_LABELS: Record<SkinSpecies, string> = {
+  koi: "锦鲤",
+  silvercarp: "银鲩",
+};
+
+const SPECIES_OPTIONS: readonly (readonly [SkinSpecies, string])[] = SKIN_SPECIES.map(
+  (species) => [species, SPECIES_LABELS[species]] as const,
+);
+
+const skinThumbUrls = new Map<string, string>();
+
+function tierLabel(tier: SkinTier): string {
+  return tier === "default" ? "默认" : SEASON_LABELS[tier];
+}
+
+function skinThumb(skin: SkinRecord): HTMLImageElement {
+  let url = skinThumbUrls.get(skin.id);
+  if (!url) {
+    url = URL.createObjectURL(skin.blob);
+    skinThumbUrls.set(skin.id, url);
+  }
+  return elem("img", { class: "skin-thumb", src: url, alt: skin.name });
+}
+
+async function applySkins(ctx: PanelCtx): Promise<void> {
+  if (!ctx.persister.packId) return;
+  const resolved = await resolvePack(ctx.persister.packId, ctx.persister.skinBindings);
+  if (resolved) ctx.scene.setSkins(buildPackSkins(resolved.skins));
+}
+
+function skinTile(skin: SkinRecord, ctx: PanelCtx, redraw: () => void): HTMLElement {
+  const name = elem("span", { class: "koi-tile-name", text: skin.name });
+  const species = elem("small", { text: SPECIES_LABELS[skin.species] });
+  const edit = elem("button", { type: "button", class: "tile-btn", text: "编辑" });
+  let draft: { name: HTMLInputElement; species: HTMLSelectElement } | null = null;
+
+  const commit = async (): Promise<void> => {
+    if (!draft) return;
+    const next = await editSkin(skin, draft.name.value, draft.species.value as SkinSpecies);
+    if (next.species !== skin.species) {
+      ctx.persister.skinBindings = pruneSkinBindings(ctx.persister.skinBindings, skin.id);
+      await writeSave(ctx.persister.snapshot());
+      await applySkins(ctx);
+      ctx.toast("物种变了，相关绑定已解除");
+    } else ctx.toast("皮肤信息已保存");
+    redraw();
+  };
+
+  edit.addEventListener("click", () => {
+    if (draft) {
+      void commit();
+      return;
+    }
+    draft = {
+      name: elem("input", {
+        type: "text",
+        class: "koi-name",
+        value: skin.name,
+        maxlength: SKIN_NAME_MAX,
+        "aria-label": "皮肤名称",
+      }),
+      species: select(skin.species, SPECIES_OPTIONS, "皮肤物种", () => {}),
+    };
+    name.replaceWith(draft.name, draft.species);
+    species.remove();
+    edit.textContent = "保存";
+    draft.name.focus();
+  });
+
+  const release = confirmButton("删除", () => {
+    void removeSkin(skin.id).then(async () => {
+      const url = skinThumbUrls.get(skin.id);
+      if (url) {
+        URL.revokeObjectURL(url);
+        skinThumbUrls.delete(skin.id);
+      }
+      ctx.persister.skinBindings = pruneSkinBindings(ctx.persister.skinBindings, skin.id);
+      await writeSave(ctx.persister.snapshot());
+      ctx.toast(`已删除皮肤「${skin.name}」`);
+      await applySkins(ctx);
+      redraw();
+    });
+  });
+
+  return elem(
+    "div",
+    { class: "fish-tile" },
+    skinThumb(skin),
+    elem(
+      "div",
+      { class: "fish-tile-foot" },
+      name,
+      species,
+      elem("div", { class: "fish-actions" }, edit, release),
+    ),
+  );
+}
+
+function skinLibrary(ctx: PanelCtx, onSkinChanged: () => void): HTMLElement {
+  const grid = elem("div", { class: "skin-grid" });
+  const file = elem("input", { type: "file", accept: "image/*", "aria-label": "皮肤图片" });
+  const name = elem("input", {
+    type: "text",
+    class: "koi-name",
+    placeholder: "皮肤名称",
+    maxlength: SKIN_NAME_MAX,
+    "aria-label": "皮肤名称",
+  });
+  let species: SkinSpecies = "koi";
+  const speciesSelect = select<SkinSpecies>("koi", SPECIES_OPTIONS, "皮肤物种", (v) => {
+    species = v;
+  });
+  const empty = elem("p", {
+    class: "skin-empty",
+    text: "还没有皮肤 · 选一张透明底、鼻朝右的鱼贴图导入即可绑定到池塘",
+  });
+
+  const draw = async (): Promise<void> => {
+    const skins = await listSkins();
+    grid.replaceChildren(...(skins.length ? skins.map((s) => skinTile(s, ctx, redraw)) : [empty]));
+  };
+
+  const redraw = (): void => {
+    void draw();
+    onSkinChanged();
+  };
+
+  const add = (): void => {
+    const blob = file.files?.[0];
+    if (!blob) {
+      ctx.toast("先选一张皮肤图片");
+      return;
+    }
+    void addSkin(name.value, species, blob).then(async (record) => {
+      name.value = "";
+      file.value = "";
+      ctx.toast(`皮肤「${record.name}」已入库`);
+      redraw();
+    });
+  };
+
+  const addRow = elem(
+    "div",
+    { class: "skin-add form-actions" },
+    file,
+    name,
+    speciesSelect,
+    elem("button", { type: "button", text: "导入皮肤", onclick: add }),
+  );
+
+  void draw();
+  return elem(
+    "div",
+    { class: "skin-library" },
+    elem("p", { class: "panel-summary", text: "皮肤库" }),
+    grid,
+    addRow,
+  );
+}
+
+function packEditor(ctx: PanelCtx, pack: PondPack, skins: SkinRecord[]): HTMLElement {
+  const active = ctx.persister.packId === pack.id;
+  const binds = elem("div", { class: "skin-binds" });
+  for (const species of SKIN_SPECIES) {
+    for (const tier of SKIN_TIERS) {
+      const bound = ctx.persister.skinBindings?.[pack.id]?.[tier]?.[species] ?? "";
+      const options: (readonly [string, string])[] = [
+        ["", tier === "default" ? "程序化" : "跟随默认"],
+        ...skins
+          .filter((s) => s.species === species)
+          .map((s) => [s.id, s.name] as readonly [string, string]),
+      ];
+      binds.append(
+        elem(
+          "label",
+          { class: "skin-bind" },
+          elem("small", { text: `${SPECIES_LABELS[species]} · ${tierLabel(tier)}` }),
+          select(bound, options, `${SPECIES_LABELS[species]} ${tierLabel(tier)}皮肤`, (value) => {
+            ctx.persister.skinBindings = withSkinBinding(
+              ctx.persister.skinBindings,
+              pack.id,
+              tier,
+              species,
+              value || undefined,
+            );
+            void writeSave(ctx.persister.snapshot()).then(() =>
+              active ? applySkins(ctx) : undefined,
+            );
+          }),
+        ),
+      );
+    }
+  }
+
+  const images = elem("div", { class: "pack-images" });
+  for (const season of Object.keys(pack.seasons) as Season[]) {
+    const input = elem("input", {
+      type: "file",
+      accept: "image/*",
+      "aria-label": `${SEASON_LABELS[season]}季新底图`,
+      onchange: () => {
+        const blob = input.files?.[0];
+        if (!blob) return;
+        void writeAsset(seasonAssetId(pack.id, season), blob).then(() => location.reload());
+      },
+    });
+    images.append(controlRow(`${SEASON_LABELS[season]}季底图`, "换图后重载生效", input));
+  }
+
+  return elem("div", { class: "pack-editor" }, binds, images);
+}
+
 export function renderPond(content: HTMLElement, ctx: PanelCtx): void {
   const list = elem("div", { class: "pack-list" });
+  let editing: string | undefined;
 
   const enable = (id: string | undefined): void => {
     ctx.persister.packId = id;
@@ -419,11 +638,16 @@ export function renderPond(content: HTMLElement, ctx: PanelCtx): void {
 
   const packRow = (pack: PondPack): HTMLElement => {
     const active = ctx.persister.packId === pack.id;
+    const opened = editing === pack.id;
     const del = confirmButton("删除", () => {
-      void removePack(pack).then(() => {
+      void removePack(pack).then(async () => {
+        ctx.persister.skinBindings = prunePackBindings(ctx.persister.skinBindings, pack.id);
         ctx.toast(`已删除「${pack.name}」`);
         if (active) enable(undefined);
-        else void paint();
+        else {
+          await writeSave(ctx.persister.snapshot());
+          await paint();
+        }
       });
     });
     return elem(
@@ -446,18 +670,35 @@ export function renderPond(content: HTMLElement, ctx: PanelCtx): void {
               text: "启用",
               onclick: () => enable(pack.id),
             }),
+        elem("button", {
+          type: "button",
+          class: "tile-btn",
+          text: opened ? "收起" : "编辑",
+          onclick: () => {
+            editing = opened ? undefined : pack.id;
+            void paint();
+          },
+        }),
         del,
       ),
     );
   };
 
   const paint = async (): Promise<void> => {
-    const packs = await listPacks();
-    list.replaceChildren(defaultRow(), ...packs.map(packRow));
+    const [packs, skins] = await Promise.all([listPacks(), listSkins()]);
+    list.replaceChildren(
+      defaultRow(),
+      ...packs.map((pack) =>
+        editing === pack.id
+          ? elem("div", { class: "pack-item" }, packRow(pack), packEditor(ctx, pack, skins))
+          : packRow(pack),
+      ),
+    );
   };
 
   content.replaceChildren(
-    elem("p", { class: "panel-summary", text: "选择池塘底图 · 启用后重载生效" }),
+    elem("p", { class: "panel-summary", text: "皮肤库与池塘包 · 换底图后重载生效" }),
+    skinLibrary(ctx, () => void paint()),
     list,
     importForm(ctx, () => void paint(), enable),
   );
@@ -476,12 +717,11 @@ function importForm(
     "aria-label": "池塘包 JSON",
   });
   const seasonBox = elem("div", { class: "pack-seasons" });
-  const skinBox = elem("div", { class: "pack-skins" });
   const actions = elem("div", { class: "form-actions" });
   const enableBox = toggle(true, "导入后立即启用", () => {});
   const seasonInputs = new Map<Season, HTMLInputElement>();
-  const skinInputs = new Map<SkinSpecies, HTMLInputElement>();
   let parsed: PondPack | null = null;
+  let updating = false;
 
   function submit(): void {
     if (!parsed) return;
@@ -490,26 +730,19 @@ function importForm(
       const f = input.files?.[0];
       if (f) files[season] = f;
     }
-    const skins: Partial<Record<SkinSpecies, Blob>> = {};
-    for (const [species, input] of skinInputs) {
-      const f = input.files?.[0];
-      if (f) skins[species] = f;
-    }
-    void importPack(parsed, files, skins)
+    void importPack(parsed, files)
       .then((bound) => {
-        ctx.toast(`已导入「${bound.name}」`);
+        ctx.toast(`${updating ? "已更新" : "已导入"}「${bound.name}」`);
         onImported();
         if (enableBox.checked) enable(bound.id);
       })
       .catch(() => ctx.toast("请至少为一个季节选择底图"));
   }
 
-  function parse(): void {
+  async function parse(): Promise<void> {
     seasonBox.replaceChildren();
-    skinBox.replaceChildren();
     actions.replaceChildren();
     seasonInputs.clear();
-    skinInputs.clear();
     parsed = null;
     let raw: unknown;
     try {
@@ -524,6 +757,7 @@ function importForm(
       return;
     }
     parsed = pack;
+    updating = (await listPacks()).some((p) => p.id === pack.id);
     for (const season of Object.keys(pack.seasons) as Season[]) {
       const input = elem("input", {
         type: "file",
@@ -531,26 +765,27 @@ function importForm(
         "aria-label": `${SEASON_LABELS[season]}季底图`,
       });
       seasonInputs.set(season, input);
-      seasonBox.append(controlRow(`${SEASON_LABELS[season]}季底图`, "选择该季节的图片", input));
-    }
-    for (const species of ["koi", "silvercarp"] as SkinSpecies[]) {
-      const input = elem("input", {
-        type: "file",
-        accept: "image/*",
-        "aria-label": SPECIES_LABELS[species],
-      });
-      skinInputs.set(species, input);
-      skinBox.append(controlRow(SPECIES_LABELS[species], "可选 · 透明底、鼻朝右的鱼贴图", input));
+      seasonBox.append(
+        controlRow(
+          `${SEASON_LABELS[season]}季底图`,
+          updating ? "不选则保留现有底图" : "选择该季节的图片",
+          input,
+        ),
+      );
     }
     actions.append(
       controlRow("立即启用", "导入后重载并应用", enableBox),
       elem(
         "div",
         { class: "form-actions" },
-        elem("button", { type: "button", text: "导入", onclick: submit }),
+        elem("button", { type: "button", text: updating ? "更新" : "导入", onclick: submit }),
       ),
     );
-    ctx.toast(`已解析「${pack.name}」· ${seasonSummary(pack)}`);
+    ctx.toast(
+      updating
+        ? `「${pack.name}」已存在 · 本次为更新，未选图的季节保留原底图`
+        : `已解析「${pack.name}」· ${seasonSummary(pack)}`,
+    );
   }
 
   const fileInput = elem("input", {
@@ -572,7 +807,12 @@ function importForm(
       "div",
       { class: "form-actions" },
       fileInput,
-      elem("button", { type: "button", class: "secondary", text: "解析", onclick: parse }),
+      elem("button", {
+        type: "button",
+        class: "secondary",
+        text: "解析",
+        onclick: () => void parse(),
+      }),
     ),
     promptBlock(
       "复制底图提示词",
@@ -587,7 +827,6 @@ function importForm(
       ctx.toast,
     ),
     seasonBox,
-    skinBox,
     actions,
   );
 }

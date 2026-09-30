@@ -28,6 +28,17 @@ describe("Persister", () => {
     expect(snap.daily!.count).toBe(4);
   });
 
+  it("snapshot 携带使用中包与皮肤绑定", () => {
+    const p = makePersister();
+    expect(p.snapshot().packId).toBeUndefined();
+    expect(p.snapshot().skinBindings).toBeUndefined();
+    p.packId = "pond-1";
+    p.skinBindings = { "pond-1": { autumn: { koi: "skin-1" } } };
+    const snap = p.snapshot();
+    expect(snap.packId).toBe("pond-1");
+    expect(snap.skinBindings).toEqual({ "pond-1": { autumn: { koi: "skin-1" } } });
+  });
+
   it("bumpFeed 累加当日投喂次数", () => {
     const p = makePersister();
     p.bumpFeed();

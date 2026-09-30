@@ -1,6 +1,8 @@
 import { createFish } from "./fish.ts";
 import { clamp, randomSeed } from "./math.ts";
 import { PALETTES } from "./palette.ts";
+import { SKIN_SPECIES, SKIN_TIERS } from "./skins.ts";
+import type { SkinBindings, SkinPackBinding, SkinSlot } from "./skins.ts";
 import { QUALITIES, INTERACTIONS } from "./types.ts";
 import type {
   DailyCount,
@@ -105,9 +107,36 @@ function sanitizeDaily(raw: unknown): DailyCount | undefined {
   return { date: d.date, count: clamp(Math.floor(Number(d.count) || 0), 0, 999999) };
 }
 
+function sanitizeSkinBindings(raw: unknown): SkinBindings | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const out: SkinBindings = {};
+  for (const [packId, packRaw] of Object.entries(raw)) {
+    if (!packRaw || typeof packRaw !== "object") continue;
+    const tiers: SkinPackBinding = {};
+    for (const [rawTier, slotRaw] of Object.entries(packRaw)) {
+      const tier = SKIN_TIERS.find((t) => t === rawTier);
+      if (!tier || !slotRaw || typeof slotRaw !== "object") continue;
+      const slot: SkinSlot = {};
+      for (const species of SKIN_SPECIES) {
+        const id = (slotRaw as Record<string, unknown>)[species];
+        if (typeof id === "string" && id) slot[species] = id.slice(0, 200);
+      }
+      if (Object.keys(slot).length) tiers[tier] = slot;
+    }
+    if (Object.keys(tiers).length) out[packId.slice(0, 200)] = tiers;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 export function sanitizeSave(data: unknown): SanitizedSave | null {
   if (!data || typeof data !== "object") return null;
-  const src = data as { fish?: unknown; settings?: unknown; daily?: unknown; packId?: unknown };
+  const src = data as {
+    fish?: unknown;
+    settings?: unknown;
+    daily?: unknown;
+    packId?: unknown;
+    skinBindings?: unknown;
+  };
   if (!Array.isArray(src.fish) || src.fish.length === 0) return null;
 
   const fish: StoredFish[] = src.fish
@@ -136,8 +165,10 @@ export function sanitizeSave(data: unknown): SanitizedSave | null {
   const daily = sanitizeDaily(src.daily);
   const packId =
     typeof src.packId === "string" && src.packId ? src.packId.slice(0, 200) : undefined;
+  const skinBindings = sanitizeSkinBindings(src.skinBindings);
   const out: SanitizedSave = { fish, settings };
   if (daily) out.daily = daily;
   if (packId) out.packId = packId;
+  if (skinBindings) out.skinBindings = skinBindings;
   return out;
 }

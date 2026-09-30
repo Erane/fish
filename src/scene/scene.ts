@@ -7,7 +7,7 @@ import { hexToRgb01 } from "../style.ts";
 import { PALETTES } from "../core/palette.ts";
 import { fishSprite, girthOf, halfWidth } from "../art/koi.ts";
 import type { FishSkin } from "../art/skin.ts";
-import type { PackSprites } from "../core/pack.ts";
+import type { SkinSpecies } from "../core/skins.ts";
 import { absorption, lerpLook, lookFor } from "./look.ts";
 import { moonPhase } from "./moon.ts";
 import type { MoonPhase } from "./moon.ts";
@@ -93,7 +93,7 @@ export class PondScene {
   look: Look;
   onLightning: ((strength: number) => void) | null = null;
   private seasonTint: Vec3 | null = null;
-  private skins: Partial<Record<keyof PackSprites, FishSkin>> = {};
+  private skins: Partial<Record<SkinSpecies, FishSkin>> = {};
   w = 1;
   h = 1;
   scale = 1;
@@ -177,7 +177,7 @@ export class PondScene {
     this.R.drop(f.x * this.w, f.y * this.h, 12 * this.scale, 0.8);
   }
 
-  setSkins(skins: Partial<Record<keyof PackSprites, FishSkin>>): void {
+  setSkins(skins: Partial<Record<SkinSpecies, FishSkin>>): void {
     this.skins = skins;
     for (const f of this.sim.allFish) {
       const e = this.entries.get(f);

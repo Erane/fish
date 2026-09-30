@@ -1,3 +1,5 @@
+import type { SkinBindings } from "./skins.ts";
+
 export type FishKind =
   | "kohaku"
   | "sanke"
@@ -147,4 +149,5 @@ export interface SanitizedSave {
   settings: Partial<Settings>;
   daily?: DailyCount;
   packId?: string;
+  skinBindings?: SkinBindings;
 }

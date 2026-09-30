@@ -1,4 +1,5 @@
 import { BODY } from "../core/index.ts";
+import type { SkinSpecies } from "../core/skins.ts";
 import { CELL_H, CELL_W } from "../render/batch.ts";
 
 export interface FishSkin {
@@ -83,4 +84,13 @@ export function skinWidths(canvas: HTMLCanvasElement): Float32Array {
 export function fishSkin(image: HTMLImageElement | ImageBitmap): FishSkin {
   const canvas = normalizeSkin(image);
   return { canvas, widths: skinWidths(canvas) };
+}
+
+export function buildPackSkins(
+  images: Partial<Record<SkinSpecies, HTMLImageElement>>,
+): Partial<Record<SkinSpecies, FishSkin>> {
+  const out: Partial<Record<SkinSpecies, FishSkin>> = {};
+  for (const [species, img] of Object.entries(images) as [SkinSpecies, HTMLImageElement][])
+    out[species] = fishSkin(img);
+  return out;
 }

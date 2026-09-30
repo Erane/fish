@@ -143,6 +143,29 @@ describe("sanitizeSave", () => {
     ).toBe(60);
   });
 
+  it("皮肤绑定只保留合法档位与物种，皮肤 id 被截断", () => {
+    const saved = sanitizeSave({
+      fish: [{ name: "小满" }],
+      skinBindings: {
+        "pond-1": {
+          default: { koi: "skin-1", goldfish: "x" },
+          autumn: { silvercarp: "s2".padEnd(300, "0") },
+          night: { koi: "skin-3" },
+        },
+        "pond-2": "bogus",
+      },
+    })!;
+    expect(saved.skinBindings).toEqual({
+      "pond-1": {
+        default: { koi: "skin-1" },
+        autumn: { silvercarp: "s2" + "0".repeat(198) },
+      },
+    });
+    expect(
+      sanitizeSave({ fish: [{ name: "小满" }], skinBindings: "bogus" })!.skinBindings,
+    ).toBeUndefined();
+  });
+
   it("手绘花纹经过存档清洗后保留，丢弃无效笔触", () => {
     const data = sanitizeSave({
       fish: [

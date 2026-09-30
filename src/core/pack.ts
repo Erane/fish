@@ -33,11 +33,6 @@ export interface SeasonAsset {
   floaters?: { kind: "petal" | "leaf" | "snow"; density: number; color: string }[];
 }
 
-export interface PackSprites {
-  koi?: string;
-  silvercarp?: string;
-}
-
 export interface PondPack {
   format: number;
   id: string;
@@ -45,7 +40,6 @@ export interface PondPack {
   style: string;
   water: PackWater;
   seasons: Partial<Record<Season, SeasonAsset>>;
-  sprites?: PackSprites;
 }
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -136,15 +130,6 @@ function seasons(raw: unknown): PondPack["seasons"] | null {
   return count > 0 ? out : null;
 }
 
-function sprites(raw: unknown): PackSprites | undefined {
-  if (!isObj(raw)) return undefined;
-  const out: PackSprites = {};
-  if (typeof raw.koi === "string" && raw.koi) out.koi = raw.koi.slice(0, 200);
-  if (typeof raw.silvercarp === "string" && raw.silvercarp)
-    out.silvercarp = raw.silvercarp.slice(0, 200);
-  return Object.keys(out).length ? out : undefined;
-}
-
 export function parsePack(raw: unknown): PondPack | null {
   if (!isObj(raw) || raw.format !== 1) return null;
   if (typeof raw.id !== "string" || !raw.id) return null;
@@ -152,7 +137,7 @@ export function parsePack(raw: unknown): PondPack | null {
   const poly = polygon(raw.water.polygon);
   const sea = seasons(raw.seasons);
   if (!poly || !sea) return null;
-  const out: PondPack = {
+  return {
     format: 1,
     id: raw.id.slice(0, 200),
     name: typeof raw.name === "string" ? raw.name.slice(0, 80) : raw.id,
@@ -164,9 +149,6 @@ export function parsePack(raw: unknown): PondPack | null {
     },
     seasons: sea,
   };
-  const sp = sprites(raw.sprites);
-  if (sp) out.sprites = sp;
-  return out;
 }
 
 export function seasonForDate(date: Date): Season {

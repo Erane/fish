@@ -10,3 +10,15 @@ export { pointInPoly, signedDistToPoly, pushInside } from "./boundary.ts";
 export { sanitizeSave, cleanKoiName } from "./save.ts";
 export { SEASONS, parsePack, seasonForDate, pickSeason } from "./pack.ts";
 export type { PondPack, Season, SeasonAsset, PackWater } from "./pack.ts";
+export {
+  SKIN_SPECIES,
+  SKIN_TIERS,
+  SKIN_NAME_MAX,
+  SKIN_UNNAMED,
+  cleanSkinName,
+  resolveSkinBinding,
+  withSkinBinding,
+  pruneSkinBindings,
+  prunePackBindings,
+} from "./skins.ts";
+export type { SkinSpecies, SkinTier, SkinSlot, SkinPackBinding, SkinBindings } from "./skins.ts";

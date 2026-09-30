@@ -1,11 +1,13 @@
 import type { SanitizedSave } from "../core/types.ts";
 import type { PondPack } from "../core/pack.ts";
+import type { SkinRecord } from "./skins.ts";
 
 const DB_NAME = "pond";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STATE = "state";
 const PACKS = "packs";
 const ASSETS = "assets";
+const SKINS = "skins";
 const SAVE_KEY = "save";
 
 let opening: Promise<IDBDatabase> | null = null;
@@ -16,7 +18,7 @@ function open(): Promise<IDBDatabase> {
       const req = indexedDB.open(DB_NAME, DB_VERSION);
       req.onupgradeneeded = () => {
         const db = req.result;
-        for (const name of [STATE, PACKS, ASSETS])
+        for (const name of [STATE, PACKS, ASSETS, SKINS])
           if (!db.objectStoreNames.contains(name)) db.createObjectStore(name);
       };
       req.onsuccess = () => resolve(req.result);
@@ -66,6 +68,12 @@ async function keys(store: string): Promise<string[]> {
   return request(tx.objectStore(store).getAllKeys() as IDBRequest<string[]>);
 }
 
+async function all<T>(store: string): Promise<T[]> {
+  const db = await open();
+  const tx = db.transaction(store, "readonly");
+  return request(tx.objectStore(store).getAll() as IDBRequest<T[]>);
+}
+
 export const loadSave = (): Promise<SanitizedSave | null> =>
   get<SanitizedSave>(STATE, SAVE_KEY).then((v) => v ?? null);
 export const writeSave = (save: SanitizedSave): Promise<void> => put(STATE, SAVE_KEY, save);
@@ -78,3 +86,8 @@ export const listPackIds = (): Promise<string[]> => keys(PACKS);
 export const loadAsset = (id: string): Promise<Blob | undefined> => get<Blob>(ASSETS, id);
 export const writeAsset = (id: string, blob: Blob): Promise<void> => put(ASSETS, id, blob);
 export const deleteAsset = (id: string): Promise<void> => del(ASSETS, id);
+
+export const loadSkins = (): Promise<SkinRecord[]> => all<SkinRecord>(SKINS);
+export const loadSkin = (id: string): Promise<SkinRecord | undefined> => get<SkinRecord>(SKINS, id);
+export const writeSkin = (record: SkinRecord): Promise<void> => put(SKINS, record.id, record);
+export const deleteSkin = (id: string): Promise<void> => del(SKINS, id);

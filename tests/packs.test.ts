@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
-import { bindAssets, seasonAssetId } from "../src/data/packs.ts";
-import type { PondPack } from "../src/core/pack.ts";
+import { planSeasonAssets, seasonAssetId } from "../src/data/packs.ts";
+import type { PondPack, Season } from "../src/core/pack.ts";
 
 function basePack(over: Partial<PondPack> = {}): PondPack {
   return {
@@ -21,6 +21,10 @@ function basePack(over: Partial<PondPack> = {}): PondPack {
   };
 }
 
+function files(seasons: Season[]): Partial<Record<Season, Blob>> {
+  return Object.fromEntries(seasons.map((s) => [s, new Blob()]));
+}
+
 describe("seasonAssetId", () => {
   it("is deterministic per pack and season", () => {
     expect(seasonAssetId("user-pond-1", "summer")).toBe("asset-user-pond-1-summer");
@@ -33,33 +37,45 @@ describe("seasonAssetId", () => {
   });
 });
 
-describe("bindAssets", () => {
-  it("rewrites image ids for the seasons provided", () => {
-    const out = bindAssets(basePack(), { summer: "asset-x" });
-    expect(out.seasons.summer!.image).toBe("asset-x");
+describe("planSeasonAssets", () => {
+  it("新包：选图的季节进 overwrite，未选图的季节不出现", () => {
+    const plan = planSeasonAssets(undefined, basePack(), files(["spring"]));
+    expect(plan).toEqual({ overwrite: ["spring"], keep: [], remove: [] });
   });
 
-  it("leaves seasons without a binding untouched", () => {
-    const out = bindAssets(basePack(), { summer: "asset-x" });
-    expect(out.seasons.spring!.image).toBe("spring.png");
+  it("更新：选图的季节覆盖，未选图的季节保留存量", () => {
+    const plan = planSeasonAssets(basePack(), basePack(), files(["summer"]));
+    expect(plan.overwrite).toEqual(["summer"]);
+    expect(plan.keep).toEqual(["spring"]);
+    expect(plan.remove).toEqual([]);
   });
 
-  it("does not mutate the source pack", () => {
-    const src = basePack();
-    bindAssets(src, { summer: "asset-x", spring: "asset-y" });
-    expect(src.seasons.summer!.image).toBe("summer.png");
-    expect(src.seasons.spring!.image).toBe("spring.png");
+  it("更新：JSON 移除的季节，其存量资产被清理，仍保留的季节继续留着", () => {
+    const fewer = basePack();
+    delete fewer.seasons.spring;
+    const plan = planSeasonAssets(basePack(), fewer, {});
+    expect(plan.overwrite).toEqual([]);
+    expect(plan.keep).toEqual(["summer"]);
+    expect(plan.remove).toEqual(["spring"]);
   });
 
-  it("ignores bindings for seasons the pack does not have", () => {
-    const out = bindAssets(basePack(), { winter: "asset-w" });
-    expect(out.seasons.winter).toBeUndefined();
-    expect(out.seasons.summer!.image).toBe("summer.png");
+  it("更新：JSON 换成全新季节且无图时，旧资产全部清理且无可保留项", () => {
+    const other = basePack({
+      seasons: { winter: { image: "w.png", tint: { water: "#aabbcc" } } },
+    });
+    const plan = planSeasonAssets(basePack(), other, {});
+    expect(plan.overwrite).toEqual([]);
+    expect(plan.keep).toEqual([]);
+    expect(plan.remove).toEqual(["spring", "summer"]);
   });
 
-  it("preserves tint and the rest of the asset", () => {
-    const out = bindAssets(basePack(), { summer: "asset-x" });
-    expect(out.seasons.summer!.tint.water).toBe("#7fa88c");
-    expect(out.id).toBe("user-pond-1");
+  it("不改动传入的包对象", () => {
+    const existing = basePack();
+    const next = basePack();
+    const existingSnapshot = structuredClone(existing);
+    const nextSnapshot = structuredClone(next);
+    planSeasonAssets(existing, next, files(["spring"]));
+    expect(existing).toEqual(existingSnapshot);
+    expect(next).toEqual(nextSnapshot);
   });
 });

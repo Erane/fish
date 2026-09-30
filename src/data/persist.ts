@@ -1,4 +1,5 @@
 import type { PondSimulation } from "../core/simulation.ts";
+import type { SkinBindings } from "../core/skins.ts";
 import type { DailyCount, SanitizedSave, Settings, StoredFish } from "../core/types.ts";
 import { writeSave } from "./db.ts";
 
@@ -9,6 +10,7 @@ export function dayKey(date: Date = new Date()): string {
 export class Persister {
   daily: DailyCount = { date: dayKey(), count: 0 };
   packId: string | undefined;
+  skinBindings: SkinBindings | undefined;
   private readonly sim: PondSimulation;
   private readonly settings: Settings;
   private timer: ReturnType<typeof setTimeout> | undefined;
@@ -33,6 +35,7 @@ export class Persister {
     );
     const save: SanitizedSave = { fish, settings: { ...this.settings }, daily: { ...this.daily } };
     if (this.packId) save.packId = this.packId;
+    if (this.skinBindings) save.skinBindings = this.skinBindings;
     return save;
   }
 

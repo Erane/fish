@@ -12,9 +12,9 @@ import type { Interaction, Settings } from "./core/types.ts";
 import { builtinBed, packBed } from "./render/pondBed.ts";
 import type { PondBed } from "./render/pondBed.ts";
 import { buildSprites } from "./art/sprites.ts";
-import { fishSkin } from "./art/skin.ts";
+import { buildPackSkins } from "./art/skin.ts";
 import type { FishSkin } from "./art/skin.ts";
-import type { PackSprites } from "./core/pack.ts";
+import type { SkinSpecies } from "./core/skins.ts";
 import { createRenderer } from "./render/renderer.ts";
 import { QUALITY_SPEC, tierDpr } from "./render/quality.ts";
 import type { Renderer } from "./render/types.ts";
@@ -160,16 +160,12 @@ function frame(now: number): void {
 async function boot(): Promise<void> {
   const saved = sanitizeSave(await loadSave());
   if (saved) Object.assign(settings, saved.settings);
-  const skins: Partial<Record<keyof PackSprites, FishSkin>> = {};
+  let skins: Partial<Record<SkinSpecies, FishSkin>> = {};
   if (saved?.packId) {
-    const resolved = await resolvePack(saved.packId);
+    const resolved = await resolvePack(saved.packId, saved.skinBindings);
     if (resolved) {
       bed = packBed(resolved.pack, resolved.asset, resolved.image);
-      for (const [sp, img] of Object.entries(resolved.skins) as [
-        keyof PackSprites,
-        HTMLImageElement,
-      ][])
-        skins[sp] = fishSkin(img);
+      skins = buildPackSkins(resolved.skins);
     }
   }
   const fish = saved?.fish
@@ -185,6 +181,7 @@ async function boot(): Promise<void> {
   );
   persister = new Persister(sim, settings);
   persister.packId = saved?.packId;
+  persister.skinBindings = saved?.skinBindings;
   if (saved?.daily?.date === dayKey()) persister.daily = saved.daily;
   audio = new PondAudio();
   audio.configure(settings);

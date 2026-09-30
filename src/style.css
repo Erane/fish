@@ -235,7 +235,8 @@ body {
   accent-color: var(--accent);
 }
 
-.setting-row select {
+.setting-row select,
+.skin-bind select {
   font: 12px var(--sans);
   padding: 6px 8px;
   border: 1px solid var(--line);
@@ -515,6 +516,93 @@ body {
   white-space: nowrap;
 }
 
+.skin-library {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.skin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+  max-height: 30vh;
+  max-height: 30dvh;
+  overflow-y: auto;
+}
+
+.skin-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  font: 11px/1.5 var(--sans);
+  color: var(--accent);
+}
+
+.skin-thumb {
+  display: block;
+  width: 100%;
+  height: 62px;
+  object-fit: contain;
+  border-radius: 8px;
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(45deg, var(--line) 25%, transparent 25% 75%, var(--line) 75%),
+    linear-gradient(45deg, var(--line) 25%, transparent 25% 75%, var(--line) 75%);
+  background-size: 12px 12px;
+  background-position:
+    0 0,
+    6px 6px;
+}
+
+.skin-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.skin-add input[type="file"] {
+  flex: 1 1 150px;
+  min-width: 0;
+  font: 11px var(--sans);
+  color: var(--accent);
+}
+
+.skin-add .koi-name {
+  flex: 1 1 110px;
+  min-width: 0;
+}
+
+.pack-item {
+  border-bottom: 1px solid var(--line);
+}
+
+.pack-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0 12px;
+}
+
+.skin-binds {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 8px;
+}
+
+.skin-bind {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.skin-bind small {
+  font: 10px/1.2 var(--sans);
+  color: var(--accent);
+}
+
 .pack-import {
   display: flex;
   flex-direction: column;
@@ -631,7 +719,8 @@ body {
   .koi-tile-input,
   .pack-json,
   .pack-prompt textarea,
-  .setting-row select {
+  .setting-row select,
+  .skin-bind select {
     font-size: 16px;
   }
 }

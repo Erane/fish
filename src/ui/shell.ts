@@ -17,7 +17,7 @@ type PanelKind = "koi" | "weather" | "pond" | "settings" | "ranking";
 const TITLES: Record<PanelKind, string> = {
   koi: "我的锦鲤",
   weather: "池塘天气",
-  pond: "池塘底图",
+  pond: "池塘",
   settings: "池塘设置",
   ranking: "锦鲤食量榜",
 };
@@ -84,7 +84,7 @@ export class Shell {
     const labels: [PanelKind, string][] = [
       ["koi", "锦鲤"],
       ["weather", "天气"],
-      ["pond", "底图"],
+      ["pond", "池塘"],
       ["ranking", "食量榜"],
       ["settings", "设置"],
     ];
