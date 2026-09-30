@@ -4,11 +4,12 @@
 
 - 权威类型定义（SSOT）：`src/core/pack.ts` 的 `PondPack`。本文只补充类型无法表达的坐标语义与外部 AI 生产流程，字段结构以代码为准。
 - 校验入口：`parsePack()`（同文件）。不合法的包会被拒绝，回退默认池塘。
-- 加载链路：`src/data/packs.ts` `resolvePack()` → `src/render/pondBed.ts` `packBed()`。
+- 加载链路：`src/data/packs.ts` `resolvePack(packId, skinBindings)` 一次产出池底与皮肤 → `src/render/pondBed.ts` `packBed()`、`src/art/skin.ts` `buildPackSkins()`。
+- 皮肤不属于包：包只描述底图与水域，鱼贴图是全局皮肤库加存档绑定，见「皮肤库与绑定」节。
 
 ## 生产方式
 
-用户把底图交给任意多模态 AI，连同下面的提示词，让 AI 回填 JSON。图片本体单独存为二进制资产，JSON 里用 `image` 字段引用其资产 id。
+用户把底图交给任意多模态 AI，连同下面的提示词，让 AI 回填 JSON。图片二进制不进 JSON：`image` 只是文件名占位，导入时由 `seasonAssetId()` 生成资产键并绑定用户在面板上选的那张图。
 
 ## 坐标语义（类型里没有的关键约定）
 
@@ -24,23 +25,30 @@
 
 单一来源：`src/data/packPrompt.ts`。分两段，对应两种不同性质的任务：
 
-- `PACK_PROMPT`：底图分析（看图回填水面/深度/锚点 JSON，含结构示例）。
+- `PACK_PROMPT`：底图分析（看图回填水面轮廓/障碍/锚点/季节 JSON，含结构示例）。
 - `SKIN_PROMPT`：鱼皮肤生成（凭空画一张透明底、鼻朝右的鱼贴图，与底图无关）。
 
-「底图」面板对应两个复制按钮（`复制底图提示词` / `复制鱼皮肤提示词`），各带一份可展开只读全文供剪贴板不可用时手抄。本文不重复其内容，以免分叉。
+「池塘」面板对应两个复制按钮（`复制底图提示词` / `复制鱼皮肤提示词`），各带一份可展开只读全文供剪贴板不可用时手抄。本文不重复其内容，以免分叉。
 
 ## 存储
 
-- IDB `pond`（v2）：`packs` store 存 `PondPack` JSON，`assets` store 存图片 Blob（键 = `image` 字段值）。见 `src/data/db.ts`。
-- 当前启用哪个包：`save.packId`（`src/core/save.ts` 校验）。缺省或加载失败则用内置默认池塘（`builtinBed()`）。
-- 导入 / 启用 / 删除入口：顶栏「底图」面板（`src/ui/panels.ts` 的 `renderPond`）。导入时资产 id 由 `seasonAssetId()` 生成（`src/data/packs.ts`），即 `asset-{packId}-{season}`。
+- IDB `pond`（v3）：`packs` store 存 `PondPack` JSON，`assets` store 存底图 Blob（键 = `image` 字段值），`skins` store 存 `SkinRecord`（皮肤 Blob 加名称物种）。见 `src/data/db.ts`。
+- 当前启用哪个包、绑哪些皮肤：`save.packId` 与 `save.skinBindings`（均在 `src/core/save.ts` 清洗）。缺省或加载失败则用内置默认池塘与程序化锦鲤。
+- 导入 / 启用 / 编辑 / 删除入口：顶栏「池塘」面板（`src/ui/panels.ts` 的 `renderPond`）。底图资产 id 由 `seasonAssetId()` 生成（`src/data/packs.ts`），即 `asset-{packId}-{season}`；同 `id` 再次导入即更新该包——JSON 里没选图的季节保留原有资产，JSON 里删掉的季节其资产随之清理（`planSeasonAssets()`）。
 
 ## 画风
 
-`style` 为自由字符串标签（`cel`/`realistic`/`anime`…），仅用于分类展示，不影响渲染。画风由底图与精灵皮肤本身决定。
+`style` 为自由字符串标签（`cel`/`realistic`/`anime`…），仅用于分类展示，不影响渲染。画风由底图与鱼皮肤本身决定。
 
-## 精灵皮肤（可选，B 档）
+## 皮肤库与绑定
 
-`sprites.koi` / `sprites.silvercarp` 为 `assets` store 键（id 由 `skinAssetId()` 生成，即 `skin-{packId}-{species}`），指向一张**透明背景、俯视平直、鼻朝右**的鱼贴图。渲染时经 `art/skin.ts` `normalizeSkin()` 裁切并铺满鱼体单元格，再由既有脊线切片管线（`renderer.ts` `fish()`）沿脊线逐列采样变形；侧向光照宽度由贴图 alpha 实测（`skinWidths()`）。同 species 共享一张皮肤。缺省则用程序化锦鲤（`art/koi.ts`）。
+皮肤是全局资产，不属于任何一个包：一张皮肤可被多个包、多个季节复用。
 
-皮肤用 `SKIN_PROMPT` 单独生成，与底图 JSON 解耦：导入面板解析出包后**恒定**列出锦鲤/银鲩两个可选皮肤输入（不依赖 JSON 是否声明 `sprites`），用户选了哪张，`importPack()` 就绑定哪张并写出 `sprites` 字段。
+- 库：`SkinRecord`（`id` / `name` / `species` / `blob`），写入入口只有 `src/data/skins.ts` 的 `addSkin()` / `editSkin()` / `removeSkin()`；空名称回退 `SKIN_UNNAMED`。物种集合 `SKIN_SPECIES`（锦鲤 / 银鲩）。
+- 绑定：`save.skinBindings` 是「包 id → 档位 → 物种 → 皮肤 id」的四层映射，档位 `SKIN_TIERS` = 默认 + 四季；内存 SSOT 是 `Persister.skinBindings`（与 `packId` 同款快照），写存档仍走 `writeSave(persister.snapshot())` 唯一入口。
+- 回退链：当季档位 → 该包默认档位 → 程序化锦鲤（`art/koi.ts`）。解析在 `resolveSkinBinding()`，增删改与空层级回收在 `withSkinBinding()`，删皮肤 / 删包时按 `pruneSkinBindings()` / `prunePackBindings()` 清引用；绑定字段的纯逻辑全部在 `src/core/skins.ts`。
+- 贴图规格：透明背景、俯视平直、**鼻朝右**的单张鱼图。渲染时经 `art/skin.ts` `normalizeSkin()` 裁切铺满鱼体单元格，再由既有脊线切片管线（`renderer.ts` `fish()`）沿脊线逐列采样变形，侧向光照宽度由贴图 alpha 实测（`skinWidths()`）。
+- 面板：「池塘」内的皮肤库网格（导入、改名换物种、二次确认删除）与包编辑区（`SKIN_SPECIES × SKIN_TIERS` 下拉，首项「程序化 / 跟随默认」即解绑）。改绑定只热更当前包的皮肤（`applySkins()`，不重载页面），换底图仍需重载。
+- 改物种会解除该皮肤的全部绑定（物种与贴图不匹配比错绑更糟），并提示。
+
+皮肤用 `SKIN_PROMPT` 生成，与底图 JSON 完全解耦：底图包不再声明任何皮肤字段。

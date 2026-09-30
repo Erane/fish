@@ -30,7 +30,6 @@ export interface SeasonTint {
 export interface SeasonAsset {
   image: string;
   tint: SeasonTint;
-  floaters?: { kind: "petal" | "leaf" | "snow"; density: number; color: string }[];
 }
 
 export interface PondPack {
