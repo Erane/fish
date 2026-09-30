@@ -6,6 +6,7 @@ import type { WeatherSync } from "../data/weather.ts";
 import { TOKENS } from "../style.ts";
 import type { Store } from "./store.ts";
 import { elem } from "./dom.ts";
+import { Feeder } from "./feeder.ts";
 import { renderKoi, renderPond, renderRanking, renderSettings, renderWeather } from "./panels.ts";
 import type { PanelCtx } from "./panels.ts";
 
@@ -20,7 +21,7 @@ const TITLES: Record<PanelKind, string> = {
 };
 
 export class Shell {
-  feedMode = true;
+  private readonly feeder: Feeder;
   private zen = false;
   private active: PanelKind | null = null;
   private readonly bar: HTMLDivElement;
@@ -34,9 +35,7 @@ export class Shell {
   private readonly panelButtons = new Map<PanelKind, HTMLButtonElement>();
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly root: HTMLElement;
-  private readonly sim: PondSimulation;
   private readonly scene: PondScene;
-  private readonly persister: Persister;
   private readonly audio: PondAudio;
   private readonly ctx: PanelCtx;
 
@@ -50,9 +49,8 @@ export class Shell {
     weatherSync: WeatherSync,
   ) {
     this.root = root;
-    this.sim = sim;
+    this.feeder = new Feeder(sim, scene, audio, persister);
     this.scene = scene;
-    this.persister = persister;
     this.audio = audio;
 
     this.feedButton = elem("button", {
@@ -148,15 +146,17 @@ export class Shell {
   }
 
   setFeedMode(on: boolean): void {
-    this.feedMode = on;
+    this.feeder.feedMode = on;
     this.feedButton.textContent = on ? "投喂中" : "观鱼中";
     this.feedButton.classList.toggle("active", on);
     this.feedButton.setAttribute("aria-pressed", String(on));
   }
 
   toggleFeedMode(): void {
-    this.setFeedMode(!this.feedMode);
-    this.toast(this.feedMode ? "投喂已开启，轻点水面试试" : "观鱼模式 · 轻点水面，鱼儿会受惊游开");
+    this.setFeedMode(!this.feeder.feedMode);
+    this.toast(
+      this.feeder.feedMode ? "投喂已开启，轻点水面试试" : "观鱼模式 · 轻点水面，鱼儿会受惊游开",
+    );
   }
 
   private setSound(on: boolean): void {
@@ -172,23 +172,7 @@ export class Shell {
   }
 
   feedAt(x: number, y: number): void {
-    const scale = this.scene.scale;
-    this.scene.startle(x, y);
-    if (!this.feedMode) {
-      this.scene.drop(x, y, 9 * scale, 0.9);
-      this.sim.scare(x, y, 170 * scale);
-      this.audio.tap();
-      return;
-    }
-    this.scene.drop(x, y, 7 * scale, 0.5);
-    const before = this.sim.food.length;
-    if (!this.sim.feed(x, y)) {
-      this.toast("鱼食还没吃完，让小鱼慢慢享用吧");
-      return;
-    }
-    for (const p of this.sim.food.slice(before)) this.scene.drop(p.x, p.y, 3 * scale, 0.22);
-    this.audio.plop();
-    this.persister.bumpFeed();
+    if (this.feeder.feedAt(x, y) === "busy") this.toast("鱼食还没吃完，让小鱼慢慢享用吧");
   }
 
   openPanel(kind: PanelKind): void {

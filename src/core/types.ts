@@ -132,6 +132,7 @@ export interface Settings {
   volume: number;
   rainAmount: number;
   snowAmount: number;
+  wallpaperInput: boolean;
 }
 
 export interface DailyCount {

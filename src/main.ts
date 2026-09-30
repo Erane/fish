@@ -26,6 +26,15 @@ import { dayKey, Persister } from "./data/persist.ts";
 import { WeatherSync } from "./data/weather.ts";
 import { Store } from "./ui/store.ts";
 import { Shell } from "./ui/shell.ts";
+import { Feeder } from "./ui/feeder.ts";
+import {
+  bindWallpaperInput,
+  inTauri,
+  isWallpaper,
+  syncInputEnabled,
+  watchShellState,
+} from "./ui/wallpaper.ts";
+import { registerSW } from "virtual:pwa-register";
 
 const settings: Settings = { ...DEFAULT_SETTINGS };
 
@@ -206,8 +215,38 @@ async function boot(): Promise<void> {
   scene.setSeasonTint(bed.tint);
   scene.setSkins(skins);
   scene.onLightning = (k) => audio?.thunderAfter(0.4 + Math.random() * 2.2, k);
-  shell = new Shell(app, sim, scene, persister, store, audio, weatherSync);
-  shell.bind(canvas);
+  const wallpaper = isWallpaper();
+  if (wallpaper) {
+    const feeder = new Feeder(sim, scene, audio, persister);
+    canvas.addEventListener("pointerdown", (e) => {
+      feeder.feedAt(e.clientX, e.clientY);
+    });
+  } else {
+    shell = new Shell(app, sim, scene, persister, store, audio, weatherSync);
+    shell.bind(canvas);
+  }
+  if (inTauri()) {
+    const sink = persister;
+    let pondAlive = false;
+    watchShellState({
+      onPondState: (alive) => {
+        if (!wallpaper) return;
+        pondAlive = alive;
+        sink.suspend(alive);
+        if (!alive) location.reload();
+      },
+      onInputChanged: (on) => {
+        settings.wallpaperInput = on;
+        if (!wallpaper || !pondAlive) sink.schedule();
+      },
+    });
+    if (wallpaper) {
+      bindWallpaperInput();
+      syncInputEnabled(settings.wallpaperInput);
+    }
+  } else {
+    registerSW({ immediate: true });
+  }
   addEventListener("resize", resize);
   resize();
   scene.setLook(

@@ -40,7 +40,11 @@ pnpm icons      # 重新生成应用图标
 
 ## 部署
 
-推送 `main` 分支后，GitHub Actions（[.github/workflows/deploy.yml](.github/workflows/deploy.yml)）自动构建并发布至 GitHub Pages。Vite `base` 指向 `/fish/`，与仓库名保持一致。
+推送 `main` 分支后，GitHub Actions（[.github/workflows/deploy.yml](.github/workflows/deploy.yml)）自动构建并发布至 GitHub Pages。Vite `base` 为相对路径，与网页版共用一份构建产物。
+
+## Windows 桌面壁纸版
+
+`pnpm tauri build` 产出单个自包含 exe（`src-tauri/target/release/zhiyu.exe`，约 9 MB），双击即用：池塘垫在桌面图标之下铺满全部屏幕，桌面空白处可直接点击投喂，托盘常驻（打开池塘 / 壁纸可投喂 / 开机自启 / 退出），默认开机自启。设计详见 [docs/desktop-wallpaper-design.md](docs/desktop-wallpaper-design.md)，构建环境要求 Rust + MSVC。
 
 ## 项目结构
 
@@ -53,7 +57,8 @@ pnpm icons      # 重新生成应用图标
 | `src/audio/`  | Web Audio 合成音效                                   |
 | `src/ui/`     | 界面：面板、交互、设置状态                           |
 | `src/data/`   | IndexedDB 持久化、池塘包、天气数据、提示词           |
-| `docs/`       | 池塘包数据格式等设计文档                             |
+| `src-tauri/`  | Windows 壁纸外壳：桌面挂载、鼠标钩子转发、托盘       |
+| `docs/`       | 池塘包数据格式、桌面壁纸版设计文档                   |
 
 ## 灵感来源
 

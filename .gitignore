@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+src-tauri/target
+src-tauri/gen
+
 # Throwaway working docs and visual-verification harnesses
 .tmp/
 

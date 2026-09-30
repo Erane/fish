@@ -25,4 +25,5 @@ export const DEFAULT_SETTINGS: Settings = {
   volume: 0.7,
   rainAmount: 0.5,
   snowAmount: 0.5,
+  wallpaperInput: true,
 };

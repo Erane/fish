@@ -1,0 +1,26 @@
+[package]
+name = "zhiyu"
+version = "0.1.0"
+edition = "2021"
+description = "知鱼 · 可交互的锦鲤池塘动态壁纸"
+
+[lib]
+name = "zhiyu_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-autostart = "2"
+tauri-plugin-single-instance = "2"
+windows = { version = "0.62", features = [
+  "Win32_Foundation",
+  "Win32_System_Threading",
+  "Win32_UI_WindowsAndMessaging",
+] }
+
+[profile.release]
+strip = true

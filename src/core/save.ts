@@ -33,6 +33,7 @@ const BOOL_KEYS = [
   "water",
   "weatherSound",
   "sfx",
+  "wallpaperInput",
 ] as const;
 const UNIT_KEYS = [
   "waterVol",

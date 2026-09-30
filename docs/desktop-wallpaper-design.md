@@ -17,28 +17,28 @@
 - **壁纸窗口**：外壳主窗口，无边框、不可聚焦、不进任务栏，铺满整个虚拟桌面（多显示器是一整片连续池塘，鱼跨屏游动），由 Rust 挂载到桌面层。
 - **池塘窗口**：托盘「打开池塘」时创建的普通窗口，即现有 PWA 形态，完整交互。
 
-前端通过运行环境探测（存在 `__TAURI_INTERNALS__`）加 `?mode=wallpaper` 参数区分形态，壁纸模式隐藏 UI 面板、跳过 Service Worker 注册。渲染、仿真、音频、存档全部复用，前端新增改动：
+前端通过运行环境探测（存在 `__TAURI_INTERNALS__`）加窗口标签（`wallpaper`/`pond`）区分形态，壁纸模式隐藏 UI 面板、跳过 Service Worker 注册（`vite.config.ts` 的 `injectRegister: "null"`，`src/main.ts` 手动注册）。渲染、仿真、音频、存档全部复用，前端改动：
 
-- 模式探测与壁纸模式 UI 裁剪：`src/main.ts`、`src/ui/shell.ts`
-- 输入桥（新增薄文件，监听外壳事件合成标准指针事件派发画布，现有交互逻辑不改）
+- 投喂逻辑抽为 `src/ui/feeder.ts`（`Feeder`），Shell 与壁纸模式共用同一实现
+- 外壳桥接 `src/ui/wallpaper.ts`：环境探测、外壳事件监听、合成指针事件
 - `vite.config.ts` 的 `base` 由 `/fish/` 改为 `./`，一份 dist 同时服务 GitHub Pages 与 Tauri（PWA manifest 的 `start_url`/`scope` 已是相对写法）
 
 ## 子系统一：桌面挂载
 
-1. 向 Progman 窗口发送 `0x052C` 消息，系统在静态壁纸与图标层之间派生 WorkerW。
-2. 枚举顶层窗口定位图标层 `SHELLDLL_DefView`（其父可能是 Progman 或某个 WorkerW，两种结构都兼容），取 Z 序在其后的 WorkerW 作为挂载父窗口。
-3. `SetParent` 挂载，尺寸对齐虚拟桌面（`SM_XVIRTUALSCREEN` 等四值），进程声明 PerMonitorV2 DPI 感知。混合 DPI 多屏下跨度窗口只能按单一 DPI 渲染，若实测画面发虚则降级为每屏一窗（同挂一个 WorkerW）。
-4. **重挂载守护**：每约 2 秒检查窗口仍在 WorkerW 之下，失联即重跑挂载流程。壁纸轮换（含聚焦壁纸）、explorer 重启、图标显示切换均会导致失联——Windows 11 24H2 初期破坏过壁纸类应用（微软确认），各壁纸应用以重挂载逻辑恢复兼容；机制本身未被废弃，兼容成本在守护而非新挂载方式。
+1. 向 Progman 窗口发送 `0x052C` 消息可促使系统在静态壁纸与图标层之间派生 WorkerW。
+2. 挂载父窗口按优先级选取：经典结构（某 WorkerW 宿主图标层 `SHELLDLL_DefView`）取其 Z 序后继；否则取 Progman 下**可见**的 WorkerW 子层；仍无则重发 `0x052C` 再扫一轮。全部落空即挂载失败——不做 Progman 直挂（实测新桌面栈下 Progman 直接子层被壁纸视觉整体覆盖，挂了也不可见）。
+3. 先按虚拟桌面坐标摆好顶层窗口再 `SetParent`，消除子窗口坐标系歧义；挂载成功即 `show` 并 `sink`（`HWND_BOTTOM`，抵消 show 提层），进程声明 PerMonitorV2 DPI 感知。混合 DPI 多屏下跨度窗口只能按单一 DPI 渲染，若实测画面发虚则降级为每屏一窗（同挂一个 WorkerW）。
+4. **重挂载守护（2 秒轮询，连续失败后退避至 10 秒）**：窗口失联（壁纸轮换、聚焦壁纸切换、explorer 重启都会导致）或桌面层缺失时自动重挂；窗口死亡则销毁记录、以递增标签（`wallpaper`、`wallpaper-1`…）重建；每次恢复顺带重注册托盘图标（explorer 重启会吞掉托盘）。外壳日志写入 `%LOCALAPPDATA%\zhiyu\shell.log`（UTF-8，连续重复行自动折叠），记录挂载路径判定、派生结果与失败原因。
+5. 24H2 兼容事实：机制未被废弃，但行为随构建漂移——24H2 初期破坏过壁纸类应用（微软确认），各应用以重挂载逻辑恢复兼容；本机 Insider 构建（26220）已移除 `0x052C` 派生（初始化期高频重发亦无效）且壁纸视觉覆盖 Progman 子层，生产版 24H2/25H2 的 WorkerW 机制不受影响。
 
 ## 子系统二：输入转发
 
 壁纸窗口位于图标层之下，收不到鼠标消息，由外壳转发：
 
-1. `WH_MOUSE_LL` 全局低级鼠标钩子，仅在「壁纸交互」开启时安装。
-2. 事件判定：`WindowFromPoint` 确认点在桌面层，再对图标列表窗口发 `LVM_HITTEST`——命中图标则不转发（图标操作照常），空白桌面才转发。
-3. 转发内容 `{type, button, x, y}`（虚拟桌面坐标减原点得窗口本地坐标）经 Tauri 事件给前端输入桥。
-4. 回调内只做判定与事件发送，不做重活，避免触发钩子超时被系统摘除；检测到摘除自动重装。
-5. 不吞事件：转发点击的同时桌面框选等行为照常，保持桌面 100% 可用，取舍待真机实测调整。
+1. `WH_MOUSE_LL` 全局低级鼠标钩子，仅在「壁纸交互」开启时安装，专用线程消息泵驱动，禁用即摘钩。
+2. 事件判定：`WindowFromPoint` 取鼠标下的窗口，`GetAncestor(GA_ROOT)` 的根窗口类为 Progman/WorkerW 即视为桌面层，转发点击。**严禁向 explorer 跨进程发送带指针的控件消息**（曾用 `LVM_HITTEST` 判定图标命中，本地指针在 explorer 地址空间解引用导致 comctl32.dll 访问违例、explorer 崩溃循环，2026-09-30 真机确诊后移除）。代价：点桌面图标时池塘同步起涟漪（真实点击仍由图标层接收，操作不受影响）。
+3. 只转发左键按下（现有交互只消费按下，移动/右键留给桌面原生行为），坐标经虚拟屏原点换算为窗口本地坐标，经 Tauri 事件给前端输入桥合成 `pointerdown`。
+4. 回调内只做只读判定与事件发送，不做重活，避免触发钩子超时被系统摘除；检测到摘除自动重装。
 
 ## 外壳生命周期与真相源
 
@@ -48,20 +48,24 @@
   - 池塘数据 → 前端 IndexedDB（`src/data/db.ts`），零改动。
   - 壁纸交互开关 → 前端 Settings（`src/core/settings.ts`）唯一真相，托盘发事件切换、前端持久化并回发启停指令，Rust 只执行不自存。
   - 开机自启 → tauri-plugin-autostart，真相源即系统 Run 键，托盘直接读写。
+- 多窗口写入保护：托盘「打开池塘」时壁纸与池塘两个 WebView 共用同一 IndexedDB，都写存档会互相覆盖。约定池塘窗口存活期间它是唯一写入者——Rust 在池塘窗口创建/销毁时广播 `pond-state`，壁纸窗口挂起写入（`Persister.suspend`）并在池塘关闭后重载读回权威存档。
 - WebView2 启动参数附加 `--autoplay-policy=no-user-gesture-required`（壁纸无用户手势），音量沿用应用内设置。
 
 ## 项目结构与构建
 
-Tauri 默认布局恰为前端在根 + `src-tauri/` 在根，与现有仓库零冲突（pnpm-workspace.yaml 未定义 packages）。`tauri.conf.json` 的 `frontendDist` 指向 `../dist`；图标由 `scripts/gen-icons.mjs` 产物转换 ico。构建：`pnpm tauri build` 产出自包含单 exe。CI 出包（GitHub Actions Windows runner）后续再接，首版本机出。
+Tauri 默认布局恰为前端在根 + `src-tauri/` 在根，与现有仓库零冲突（pnpm-workspace.yaml 未定义 packages）。`tauri.conf.json` 的 `frontendDist` 指向 `../dist`；图标由 `scripts/gen-icons.mjs` 产物经 `pnpm tauri icon` 生成。构建：`pnpm tauri build` 产出自包含单 exe（`src-tauri/target/release/Zhiyu.exe`）。
+
+Rust 模块：`src-tauri/src/desktop.rs`（挂载与健康检查）、`src-tauri/src/input.rs`（钩子转发）、`src-tauri/src/lib.rs`（窗口、托盘、自启、单实例）。
 
 ## 错误处理
 
 - WebView2 运行时缺失（仅极老系统）：原生消息框引导下载。
-- 挂载失败：重试后降级为普通全屏窗口，仍可用。
+- 挂载失败：窗口保持隐藏、仅托盘驻留，**绝不覆盖桌面**（全屏降级会劫持图标与操作，禁止）；池塘可从托盘以普通窗口打开，守护持续重试挂载。
 - 钩子被系统摘除：检测返回值，自动重装。
 - 前端异常不做自动重启，真机验证稳定性后再议（不做过度兜底）。
 
 ## 测试
 
-- 单元：虚拟屏到窗口本地坐标换算（含多屏负坐标）、图标命中判定（纯逻辑，`pnpm test`）。
-- 真机清单（本机为 Windows 11 新构建，全链路可验证）：挂载与图标不受影响、空白处投喂、多屏连续、explorer 重启后重挂载、壁纸轮换后重挂载、自启、单实例、托盘各开关、性能（60 帧档整机功耗表现）。
+- 单元：虚拟屏到窗口本地坐标换算（含多屏负坐标）、WorkerW 选窗逻辑（`cargo test`）、指针事件合成桥（`pnpm test`）。
+- 真机清单（本机为 Windows 11 Insider 构建，已验证）：挂载到 WorkerW 时池塘垫在图标之下、图标不受影响、降级全屏可用且可投喂、explorer 死亡→重启全程守护自动恢复且无窗口泄漏、自启注册、单实例。
+- 待生产版 24H2/25H2 验证：图标之下状态的钩子转发投喂（本机 Insider 已无壁纸层，无法复现该状态）。

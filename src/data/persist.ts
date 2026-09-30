@@ -12,6 +12,7 @@ export class Persister {
   private readonly sim: PondSimulation;
   private readonly settings: Settings;
   private timer: ReturnType<typeof setTimeout> | undefined;
+  private suspended = false;
 
   constructor(sim: PondSimulation, settings: Settings) {
     this.sim = sim;
@@ -35,7 +36,13 @@ export class Persister {
     return save;
   }
 
+  suspend(on: boolean): void {
+    this.suspended = on;
+    if (on) clearTimeout(this.timer);
+  }
+
   schedule(): void {
+    if (this.suspended) return;
     clearTimeout(this.timer);
     this.timer = setTimeout(() => {
       void writeSave(this.snapshot()).catch(() => {});
