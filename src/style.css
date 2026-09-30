@@ -3,6 +3,12 @@
   --sans: system-ui, "Segoe UI", Roboto, sans-serif;
 }
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 html,
 body {
   margin: 0;
@@ -35,6 +41,7 @@ body {
   position: fixed;
   left: 50%;
   bottom: 18px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
   transform: translateX(-50%);
   display: flex;
   gap: 3px;
@@ -66,16 +73,22 @@ body {
 }
 
 .panel {
+  display: flex;
+  flex-direction: column;
   width: 420px;
   max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 50px);
   max-height: calc(100dvh - 50px);
-  padding: 20px 22px;
   border: 1px solid var(--ink);
   border-radius: 16px;
   background: var(--panel);
   color: var(--ink);
   box-shadow: 8px 12px 0 var(--shadow);
-  overflow: auto;
+  overflow: hidden;
+}
+
+.panel:not([open]) {
+  display: none;
 }
 
 .panel::backdrop {
@@ -84,8 +97,10 @@ body {
 
 .panel-head {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
+  padding: 20px 22px 0;
 }
 
 .panel-head h2 {
@@ -100,6 +115,13 @@ body {
   font: 11px/1 var(--sans);
   color: var(--accent);
   cursor: pointer;
+  padding: 8px 4px;
+}
+
+.panel-content {
+  min-height: 0;
+  padding: 0 22px 20px;
+  overflow-y: auto;
 }
 
 .panel-summary {
@@ -131,6 +153,11 @@ body {
 
 .rank-row:nth-child(-n + 3) .rank-number {
   color: var(--rust);
+}
+
+.rank-row .fish-thumb {
+  width: 88px;
+  flex-shrink: 0;
 }
 
 .rank-info {
@@ -165,9 +192,12 @@ body {
 
 .fish-thumb {
   display: block;
-  width: 100%;
   height: auto;
   image-rendering: auto;
+}
+
+.fish-tile .fish-thumb {
+  width: 100%;
 }
 
 .setting-row {
@@ -292,6 +322,9 @@ body {
   grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   gap: 10px;
   margin: 10px 0 18px;
+  max-height: 38vh;
+  max-height: 38dvh;
+  overflow-y: auto;
 }
 
 .fish-tile {
@@ -492,7 +525,6 @@ body {
 }
 
 .pack-json {
-  box-sizing: border-box;
   width: 100%;
   resize: vertical;
   font: 12px/1.5 var(--sans);
@@ -522,7 +554,6 @@ body {
 }
 
 .pack-prompt textarea {
-  box-sizing: border-box;
   width: 100%;
   margin-top: 6px;
   resize: vertical;
@@ -538,15 +569,17 @@ body {
   position: fixed;
   top: 18px;
   right: 18px;
-  padding: 9px 14px;
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  right: calc(env(safe-area-inset-right, 0px) + 14px);
+  padding: 12px 16px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--panel);
   color: var(--accent);
-  font: 11px/1 var(--sans);
+  font: 12px/1 var(--sans);
   letter-spacing: 1px;
   cursor: pointer;
-  opacity: 0.4;
+  opacity: 0.85;
   transition: opacity 0.25s;
 }
 
@@ -579,4 +612,26 @@ body {
 
 .toast.show {
   opacity: 0.94;
+}
+
+@media (max-width: 480px) {
+  .bar {
+    flex-wrap: wrap;
+    justify-content: center;
+    width: calc(100vw - 20px);
+  }
+
+  .bar button {
+    font: 10px/1 var(--sans);
+    padding: 10px 9px;
+  }
+
+  .city-input,
+  .koi-name,
+  .koi-tile-input,
+  .pack-json,
+  .pack-prompt textarea,
+  .setting-row select {
+    font-size: 16px;
+  }
 }
