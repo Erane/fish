@@ -18,7 +18,7 @@ import { writeAsset, writeSave } from "../data/db.ts";
 import { importPack, listPacks, removePack, resolvePack, seasonAssetId } from "../data/packs.ts";
 import { addSkin, editSkin, listSkins, removeSkin } from "../data/skins.ts";
 import type { SkinRecord } from "../data/skins.ts";
-import { PACK_PROMPT, SKIN_PROMPT } from "../data/packPrompt.ts";
+import { BG_PROMPT, PACK_PROMPT, SKIN_PROMPT } from "../data/packPrompt.ts";
 import type { WeatherSync } from "../data/weather.ts";
 import type { PondScene } from "../scene/scene.ts";
 import { fishSprite } from "../art/koi.ts";
@@ -815,8 +815,14 @@ function importForm(
       }),
     ),
     promptBlock(
-      "复制底图提示词",
-      "底图提示词全文（剪贴板不可用时手动复制）",
+      "复制背景图生成提示词",
+      "背景图生成提示词全文（交给 AI 凭空生成池塘俯视图）",
+      BG_PROMPT,
+      ctx.toast,
+    ),
+    promptBlock(
+      "复制底图解析提示词",
+      "底图解析提示词全文（把已做好的底图交给 AI，回填池塘包 JSON）",
       PACK_PROMPT,
       ctx.toast,
     ),
