@@ -20,7 +20,8 @@ import { QUALITY_SPEC, tierDpr } from "./render/quality.ts";
 import type { Renderer } from "./render/types.ts";
 import { PondScene } from "./scene/scene.ts";
 import { PondAudio } from "./audio/pondAudio.ts";
-import { loadSave } from "./data/db.ts";
+import { loadSave, writeSave } from "./data/db.ts";
+import { seedBuiltinThemes } from "./data/builtinPacks.ts";
 import { resolvePack } from "./data/packs.ts";
 import { dayKey, Persister } from "./data/persist.ts";
 import { WeatherSync } from "./data/weather.ts";
@@ -160,9 +161,11 @@ function frame(now: number): void {
 async function boot(): Promise<void> {
   const saved = sanitizeSave(await loadSave());
   if (saved) Object.assign(settings, saved.settings);
+  const seeded = await seedBuiltinThemes();
+  const packId = saved?.packId ?? seeded[0];
   let skins: Partial<Record<SkinSpecies, FishSkin>> = {};
-  if (saved?.packId) {
-    const resolved = await resolvePack(saved.packId, saved.skinBindings);
+  if (packId) {
+    const resolved = await resolvePack(packId, saved?.skinBindings);
     if (resolved) {
       bed = packBed(resolved.pack, resolved.asset, resolved.image);
       skins = buildPackSkins(resolved.skins);
@@ -180,8 +183,9 @@ async function boot(): Promise<void> {
     settings.silverCarp,
   );
   persister = new Persister(sim, settings);
-  persister.packId = saved?.packId;
+  persister.packId = packId;
   persister.skinBindings = saved?.skinBindings;
+  if (packId && packId !== saved?.packId) void writeSave(persister.snapshot());
   if (saved?.daily?.date === dayKey()) persister.daily = saved.daily;
   audio = new PondAudio();
   audio.configure(settings);

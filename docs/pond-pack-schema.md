@@ -35,6 +35,8 @@
 - IDB `pond`（v3）：`packs` store 存 `PondPack` JSON，`assets` store 存底图 Blob（键 = `image` 字段值），`skins` store 存 `SkinRecord`（皮肤 Blob 加名称物种）。见 `src/data/db.ts`。
 - 当前启用哪个包、绑哪些皮肤：`save.packId` 与 `save.skinBindings`（均在 `src/core/save.ts` 清洗）。缺省或加载失败则用内置默认池塘与程序化锦鲤。
 - 导入 / 启用 / 编辑 / 删除入口：顶栏「池塘」面板（`src/ui/panels.ts` 的 `renderPond`）。底图资产 id 由 `seasonAssetId()` 生成（`src/data/packs.ts`），即 `asset-{packId}-{season}`；同 `id` 再次导入即更新该包——JSON 里没选图的季节保留原有资产，JSON 里删掉的季节其资产随之清理（`planSeasonAssets()`）。
+- 内置主题：清单 `BUILTIN_THEMES`（`src/data/builtinPacks.ts`）指向 `public/theme/` 下的包 JSON 与底图，首启由 `seedBuiltinPacks()` 走 `importPack()` 落成普通包，面板上与用户导入的包无异（可换图、可删除）。播种按主题 url 记账在 IDB `state.seededThemes`，与包 id 无关，故删除后不复活；记账只在播种成功后写入，取数或导入失败下次启动重试。默认启用规则见 `src/main.ts` 的 `boot`：存档已显式选包则保留，否则启用本次新播的第一个包。
+- `public/theme/**` 不进 PWA precache（`vite.config.ts` 的 `workbox.globIgnores`）：底图首启即复制进 IDB，无需常驻缓存。
 
 ## 画风
 

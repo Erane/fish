@@ -9,6 +9,7 @@ const PACKS = "packs";
 const ASSETS = "assets";
 const SKINS = "skins";
 const SAVE_KEY = "save";
+const SEEDED_KEY = "seededThemes";
 
 let opening: Promise<IDBDatabase> | null = null;
 
@@ -91,3 +92,14 @@ export const loadSkins = (): Promise<SkinRecord[]> => all<SkinRecord>(SKINS);
 export const loadSkin = (id: string): Promise<SkinRecord | undefined> => get<SkinRecord>(SKINS, id);
 export const writeSkin = (record: SkinRecord): Promise<void> => put(SKINS, record.id, record);
 export const deleteSkin = (id: string): Promise<void> => del(SKINS, id);
+
+export const loadSeededThemes = async (): Promise<string[]> => {
+  const list = await get<string[]>(STATE, SEEDED_KEY);
+  return Array.isArray(list) ? list : [];
+};
+
+export const addSeededTheme = async (url: string): Promise<void> => {
+  const list = await loadSeededThemes();
+  if (list.includes(url)) return;
+  await put(STATE, SEEDED_KEY, [...list, url]);
+};
