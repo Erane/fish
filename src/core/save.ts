@@ -1,7 +1,7 @@
 import { createFish } from "./fish.ts";
 import { clamp, randomSeed } from "./math.ts";
 import { PALETTES } from "./palette.ts";
-import { QUALITIES } from "./types.ts";
+import { QUALITIES, INTERACTIONS } from "./types.ts";
 import type {
   DailyCount,
   FishMark,
@@ -19,6 +19,7 @@ export function cleanKoiName(raw: string): string {
 
 const WEATHER = ["sunny", "cloudy", "rain", "snow"];
 const QUALITY: readonly string[] = QUALITIES;
+const INTERACTION: readonly string[] = INTERACTIONS;
 const WATER_TYPE = ["stream", "spring", "cascade", "lapping", "bamboo"];
 const MUSIC = ["guqin", "bowl", "chimes", "off"];
 const BOOL_KEYS = [
@@ -33,7 +34,6 @@ const BOOL_KEYS = [
   "water",
   "weatherSound",
   "sfx",
-  "wallpaperInput",
 ] as const;
 const UNIT_KEYS = [
   "waterVol",
@@ -54,6 +54,8 @@ function sanitizeSettings(raw: unknown): Partial<Settings> {
   if (WATER_TYPE.includes(s.waterType as string))
     out.waterType = s.waterType as Settings["waterType"];
   if (MUSIC.includes(s.music as string)) out.music = s.music as Settings["music"];
+  if (INTERACTION.includes(s.interaction as string))
+    out.interaction = s.interaction as Settings["interaction"];
   if (Number.isFinite(s.speed as number)) out.speed = clamp(s.speed as number, 0.3, 2);
   for (const k of BOOL_KEYS)
     if (typeof s[k] === "boolean") (out as Record<string, boolean>)[k] = s[k] as boolean;

@@ -3,7 +3,8 @@ mod input;
 
 use std::time::Duration;
 
-use tauri::menu::{CheckMenuItem, Menu, MenuItem};
+use serde::{Deserialize, Serialize};
+use tauri::menu::{CheckMenuItem, Menu, MenuItem, Submenu};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
@@ -11,6 +12,14 @@ use tauri_plugin_single_instance::init as single_instance;
 
 const WALLPAPER: &str = "wallpaper";
 const POND: &str = "pond";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum Interaction {
+    Feed,
+    Startle,
+    Watch,
+}
 
 pub(crate) fn log(msg: &str) {
     use std::sync::Mutex;
@@ -51,7 +60,7 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
-        .invoke_handler(tauri::generate_handler![set_wallpaper_input])
+        .invoke_handler(tauri::generate_handler![set_wallpaper_mode])
         .setup(|app| {
             let handle = app.handle().clone();
             ensure_autostart(&handle);
@@ -210,13 +219,26 @@ fn open_pond(app: &AppHandle) {
 }
 
 struct TrayMenu {
-    input: CheckMenuItem<tauri::Wry>,
+    feed: CheckMenuItem<tauri::Wry>,
+    startle: CheckMenuItem<tauri::Wry>,
+    watch: CheckMenuItem<tauri::Wry>,
     auto: CheckMenuItem<tauri::Wry>,
+}
+
+impl TrayMenu {
+    fn set_mode(&self, mode: Interaction) {
+        let _ = self.feed.set_checked(mode == Interaction::Feed);
+        let _ = self.startle.set_checked(mode == Interaction::Startle);
+        let _ = self.watch.set_checked(mode == Interaction::Watch);
+    }
 }
 
 fn build_tray(app: &AppHandle) {
     let open = MenuItem::with_id(app, "open", "打开池塘", true, None::<&str>);
-    let input = CheckMenuItem::with_id(app, "input", "壁纸可投喂", true, true, None::<&str>);
+    let mode = Submenu::with_id(app, "mode", "交互模式", true);
+    let feed = CheckMenuItem::with_id(app, "mode-feed", "喂鱼", true, true, None::<&str>);
+    let startle = CheckMenuItem::with_id(app, "mode-startle", "惊扰", true, false, None::<&str>);
+    let watch = CheckMenuItem::with_id(app, "mode-watch", "观鱼", true, false, None::<&str>);
     let auto = CheckMenuItem::with_id(
         app,
         "auto",
@@ -226,13 +248,21 @@ fn build_tray(app: &AppHandle) {
         None::<&str>,
     );
     let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>);
-    let (Ok(open), Ok(input), Ok(auto), Ok(quit)) = (open, input, auto, quit) else {
+    let (Ok(open), Ok(mode), Ok(feed), Ok(startle), Ok(watch), Ok(auto), Ok(quit)) =
+        (open, mode, feed, startle, watch, auto, quit)
+    else {
         return;
     };
-    let Ok(menu) = Menu::with_items(app, &[&open, &input, &auto, &quit]) else {
+    let _ = mode.append_items(&[&feed, &startle, &watch]);
+    let Ok(menu) = Menu::with_items(app, &[&open, &mode, &auto, &quit]) else {
         return;
     };
-    app.manage(TrayMenu { input, auto });
+    app.manage(TrayMenu {
+        feed,
+        startle,
+        watch,
+        auto,
+    });
     let _ = TrayIconBuilder::with_id("zhiyu")
         .icon(app.default_window_icon().expect("图标缺失").clone())
         .tooltip("知鱼 · 池塘壁纸")
@@ -240,7 +270,9 @@ fn build_tray(app: &AppHandle) {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "open" => open_pond(app),
-            "input" => toggle_input(app),
+            "mode-feed" => change_mode(app, Interaction::Feed),
+            "mode-startle" => change_mode(app, Interaction::Startle),
+            "mode-watch" => change_mode(app, Interaction::Watch),
             "auto" => toggle_autostart(app),
             "quit" => app.exit(0),
             _ => {}
@@ -258,13 +290,12 @@ fn build_tray(app: &AppHandle) {
         .build(app);
 }
 
-fn toggle_input(app: &AppHandle) {
-    let on = !input::enabled();
-    input::set_enabled(on);
+fn change_mode(app: &AppHandle, mode: Interaction) {
+    input::set_enabled(mode != Interaction::Watch);
     if let Some(tray) = app.try_state::<TrayMenu>() {
-        let _ = tray.input.set_checked(on);
+        tray.set_mode(mode);
     }
-    let _ = app.emit("wallpaper-input-changed", on);
+    let _ = app.emit("interaction-changed", mode);
 }
 
 fn toggle_autostart(app: &AppHandle) {
@@ -289,9 +320,6 @@ fn ensure_autostart(app: &AppHandle) {
 }
 
 #[tauri::command]
-fn set_wallpaper_input(app: AppHandle, enabled: bool) {
-    input::set_enabled(enabled);
-    if let Some(tray) = app.try_state::<TrayMenu>() {
-        let _ = tray.input.set_checked(enabled);
-    }
+fn set_wallpaper_mode(app: AppHandle, mode: Interaction) {
+    change_mode(&app, mode);
 }

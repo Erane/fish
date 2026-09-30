@@ -226,6 +226,19 @@ describe("sanitizeSave", () => {
     expect(saved.settings.caustic).toBe(false);
     expect(saved.settings.causticAmount).toBe(0.5);
   });
+
+  it("交互模式只接受喂鱼、惊扰、观鱼", () => {
+    const saved = sanitizeSave({
+      fish: [{ name: "小满" }],
+      settings: { interaction: "startle" as never },
+    })!;
+    expect(saved.settings.interaction).toBe("startle");
+    const dropped = sanitizeSave({
+      fish: [{ name: "小满" }],
+      settings: { interaction: "poke" as never },
+    })!;
+    expect(dropped.settings.interaction).toBeUndefined();
+  });
 });
 
 describe("青鲢", () => {

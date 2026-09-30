@@ -44,7 +44,7 @@ pnpm icons      # 重新生成应用图标
 
 ## Windows 桌面壁纸版
 
-`pnpm tauri build` 产出单个自包含 exe（`src-tauri/target/release/zhiyu.exe`，约 9 MB），双击即用：池塘垫在桌面图标之下铺满全部屏幕，桌面空白处可直接点击投喂，托盘常驻（打开池塘 / 壁纸可投喂 / 开机自启 / 退出），默认开机自启。设计详见 [docs/desktop-wallpaper-design.md](docs/desktop-wallpaper-design.md)，构建环境要求 Rust + MSVC。
+`pnpm tauri build` 产出单个自包含 exe（`src-tauri/target/release/zhiyu.exe`，约 9 MB），双击即用：池塘垫在桌面图标之下铺满全部屏幕，桌面空白处可直接交互，托盘在喂鱼/惊扰/观鱼三种模式间切换（观鱼时点击不惊扰池塘），托盘常驻（打开池塘 / 交互模式 / 开机自启 / 退出），默认开机自启。设计详见 [docs/desktop-wallpaper-design.md](docs/desktop-wallpaper-design.md)，构建环境要求 Rust + MSVC。
 
 ## 项目结构
 

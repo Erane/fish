@@ -3,10 +3,12 @@ import type { Persister } from "../data/persist.ts";
 import type { PondScene } from "../scene/scene.ts";
 import type { PondAudio } from "../audio/pondAudio.ts";
 import type { WeatherSync } from "../data/weather.ts";
+import type { Interaction } from "../core/types.ts";
 import { TOKENS } from "../style.ts";
 import type { Store } from "./store.ts";
 import { elem } from "./dom.ts";
 import { Feeder } from "./feeder.ts";
+import { inTauri, syncInteraction } from "./wallpaper.ts";
 import { renderKoi, renderPond, renderRanking, renderSettings, renderWeather } from "./panels.ts";
 import type { PanelCtx } from "./panels.ts";
 
@@ -20,8 +22,27 @@ const TITLES: Record<PanelKind, string> = {
   ranking: "锦鲤食量榜",
 };
 
+const MODE_LABELS: Record<Interaction, string> = {
+  feed: "喂鱼",
+  startle: "惊扰",
+  watch: "观鱼",
+};
+
+const NEXT_MODE: Record<Interaction, Interaction> = {
+  feed: "startle",
+  startle: "watch",
+  watch: "feed",
+};
+
+const MODE_TOASTS: Record<Interaction, string> = {
+  feed: "喂鱼模式 · 轻点水面撒食",
+  startle: "惊扰模式 · 轻点水面，鱼儿会受惊游开",
+  watch: "观鱼模式 · 点击不再打扰池塘",
+};
+
 export class Shell {
   private readonly feeder: Feeder;
+  private readonly store: Store;
   private zen = false;
   private active: PanelKind | null = null;
   private readonly bar: HTMLDivElement;
@@ -49,13 +70,15 @@ export class Shell {
     weatherSync: WeatherSync,
   ) {
     this.root = root;
-    this.feeder = new Feeder(sim, scene, audio, persister);
+    this.feeder = new Feeder(sim, scene, audio, persister, store.settings.interaction);
+    this.store = store;
     this.scene = scene;
     this.audio = audio;
 
     this.feedButton = elem("button", {
       type: "button",
-      onclick: () => this.toggleFeedMode(),
+      class: "active",
+      onclick: () => this.cycleInteraction(),
     });
     this.bar = elem("div", { class: "bar" }, this.feedButton);
     const labels: [PanelKind, string][] = [
@@ -122,7 +145,7 @@ export class Shell {
     this.root.append(this.bar, this.dialog, this.toastEl, this.exitZen);
     for (const [key, value] of Object.entries(TOKENS))
       this.root.style.setProperty(`--${key}`, value);
-    this.setFeedMode(true);
+    this.setInteraction(store.settings.interaction);
     this.bindShortcuts();
   }
 
@@ -145,18 +168,17 @@ export class Shell {
     });
   }
 
-  setFeedMode(on: boolean): void {
-    this.feeder.feedMode = on;
-    this.feedButton.textContent = on ? "投喂中" : "观鱼中";
-    this.feedButton.classList.toggle("active", on);
-    this.feedButton.setAttribute("aria-pressed", String(on));
+  setInteraction(mode: Interaction): void {
+    this.feeder.mode = mode;
+    this.feedButton.textContent = MODE_LABELS[mode];
   }
 
-  toggleFeedMode(): void {
-    this.setFeedMode(!this.feeder.feedMode);
-    this.toast(
-      this.feeder.feedMode ? "投喂已开启，轻点水面试试" : "观鱼模式 · 轻点水面，鱼儿会受惊游开",
-    );
+  private cycleInteraction(): void {
+    const next = NEXT_MODE[this.feeder.mode];
+    this.setInteraction(next);
+    this.store.set("interaction", next);
+    if (inTauri()) syncInteraction(next);
+    this.toast(MODE_TOASTS[next]);
   }
 
   private setSound(on: boolean): void {

@@ -24,10 +24,6 @@ pub struct WallpaperInput {
     pub y: i32,
 }
 
-pub fn enabled() -> bool {
-    ENABLED.load(Ordering::Acquire)
-}
-
 pub fn set_enabled(on: bool) {
     if ENABLED.swap(on, Ordering::AcqRel) && !on {
         let tid = THREAD.load(Ordering::Acquire);

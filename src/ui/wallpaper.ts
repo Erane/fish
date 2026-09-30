@@ -1,3 +1,6 @@
+import { INTERACTIONS } from "../core/types.ts";
+import type { Interaction } from "../core/types.ts";
+
 type TauriGlobal = {
   core: { invoke(cmd: string, args?: Record<string, unknown>): Promise<unknown> };
   event: {
@@ -34,12 +37,13 @@ export function applyWallpaperInput(payload: unknown, root: Document = document)
 
 export function watchShellState(handlers: {
   onPondState: (alive: boolean) => void;
-  onInputChanged: (on: boolean) => void;
+  onInteractionChanged: (mode: Interaction) => void;
 }): void {
   void tauri().event.listen("pond-state", ({ payload }) => handlers.onPondState(payload === true));
-  void tauri().event.listen("wallpaper-input-changed", ({ payload }) =>
-    handlers.onInputChanged(payload === true),
-  );
+  void tauri().event.listen("interaction-changed", ({ payload }) => {
+    const mode = INTERACTIONS.find((m) => m === payload);
+    if (mode) handlers.onInteractionChanged(mode);
+  });
 }
 
 export function bindWallpaperInput(): void {
@@ -48,6 +52,6 @@ export function bindWallpaperInput(): void {
   });
 }
 
-export function syncInputEnabled(enabled: boolean): void {
-  void tauri().core.invoke("set_wallpaper_input", { enabled });
+export function syncInteraction(mode: Interaction): void {
+  void tauri().core.invoke("set_wallpaper_mode", { mode });
 }

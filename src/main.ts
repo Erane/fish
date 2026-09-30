@@ -8,7 +8,7 @@ import {
   revive,
   sanitizeSave,
 } from "./core/index.ts";
-import type { Settings } from "./core/types.ts";
+import type { Interaction, Settings } from "./core/types.ts";
 import { builtinBed, packBed } from "./render/pondBed.ts";
 import type { PondBed } from "./render/pondBed.ts";
 import { buildSprites } from "./art/sprites.ts";
@@ -31,7 +31,7 @@ import {
   bindWallpaperInput,
   inTauri,
   isWallpaper,
-  syncInputEnabled,
+  syncInteraction,
   watchShellState,
 } from "./ui/wallpaper.ts";
 import { registerSW } from "virtual:pwa-register";
@@ -216,33 +216,36 @@ async function boot(): Promise<void> {
   scene.setSkins(skins);
   scene.onLightning = (k) => audio?.thunderAfter(0.4 + Math.random() * 2.2, k);
   const wallpaper = isWallpaper();
+  let applyMode: (mode: Interaction) => void;
   if (wallpaper) {
-    const feeder = new Feeder(sim, scene, audio, persister);
+    const feeder = new Feeder(sim, scene, audio, persister, settings.interaction);
     canvas.addEventListener("pointerdown", (e) => {
       feeder.feedAt(e.clientX, e.clientY);
     });
+    applyMode = (mode) => {
+      feeder.mode = mode;
+    };
   } else {
     shell = new Shell(app, sim, scene, persister, store, audio, weatherSync);
     shell.bind(canvas);
+    applyMode = (mode) => shell?.setInteraction(mode);
   }
   if (inTauri()) {
     const sink = persister;
-    let pondAlive = false;
     watchShellState({
       onPondState: (alive) => {
         if (!wallpaper) return;
-        pondAlive = alive;
         sink.suspend(alive);
         if (!alive) location.reload();
       },
-      onInputChanged: (on) => {
-        settings.wallpaperInput = on;
-        if (!wallpaper || !pondAlive) sink.schedule();
+      onInteractionChanged: (mode) => {
+        store.set("interaction", mode);
+        applyMode(mode);
       },
     });
     if (wallpaper) {
       bindWallpaperInput();
-      syncInputEnabled(settings.wallpaperInput);
+      syncInteraction(settings.interaction);
     }
   } else {
     registerSW({ immediate: true });

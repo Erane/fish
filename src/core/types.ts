@@ -98,6 +98,8 @@ export interface DepthField {
 export type Weather = "sunny" | "cloudy" | "rain" | "snow";
 export const QUALITIES = ["ultra", "high", "eco"] as const;
 export type Quality = (typeof QUALITIES)[number];
+export const INTERACTIONS = ["feed", "startle", "watch"] as const;
+export type Interaction = (typeof INTERACTIONS)[number];
 export type WaterType = "stream" | "spring" | "cascade" | "lapping" | "bamboo";
 export type Music = "guqin" | "bowl" | "chimes" | "off";
 
@@ -132,7 +134,7 @@ export interface Settings {
   volume: number;
   rainAmount: number;
   snowAmount: number;
-  wallpaperInput: boolean;
+  interaction: Interaction;
 }
 
 export interface DailyCount {
