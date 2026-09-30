@@ -45,11 +45,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          nsis_dir=src-tauri/target/release/bundle/nsis
-          setup="$nsis_dir/$(ls "$nsis_dir" | grep -- '-setup.exe' | head -n 1)"
-          assets=("$setup#zhiyu-win-setup.exe" "zhiyu-win-portable.zip#zhiyu-win-portable.zip")
+          setup=$(ls src-tauri/target/release/bundle/nsis/*-setup.exe | head -n 1)
+          cp "$setup" zhiyu-win-setup.exe
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "${assets[@]}" --clobber
+            for a in $(gh release view "$TAG" --json assets --jq '.assets[].name'); do
+              case "$a" in zhiyu-win-setup.exe|zhiyu-win-portable.zip) ;; *) gh release delete-asset "$TAG" "$a" -y ;; esac
+            done
+            gh release upload "$TAG" zhiyu-win-setup.exe zhiyu-win-portable.zip --clobber
           else
-            gh release create "$TAG" --generate-notes --title "Zhiyu $TAG" "${assets[@]}"
+            gh release create "$TAG" --latest --generate-notes --title "Zhiyu $TAG" zhiyu-win-setup.exe zhiyu-win-portable.zip
           fi
