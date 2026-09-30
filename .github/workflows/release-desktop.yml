@@ -1,0 +1,55 @@
+name: Release Windows Desktop
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 发布所用 tag（不存在时以本次运行提交创建）
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-desktop
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.6.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec tauri build
+      - name: Package portable build
+        shell: pwsh
+        run: Compress-Archive -Path src-tauri/target/release/zhiyu.exe -DestinationPath zhiyu-win-portable.zip
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          nsis_dir=src-tauri/target/release/bundle/nsis
+          setup="$nsis_dir/$(ls "$nsis_dir" | grep -- '-setup.exe' | head -n 1)"
+          assets=("$setup#zhiyu-win-setup.exe" "zhiyu-win-portable.zip#zhiyu-win-portable.zip")
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${assets[@]}" --clobber
+          else
+            gh release create "$TAG" --generate-notes --title "Zhiyu $TAG" "${assets[@]}"
+          fi

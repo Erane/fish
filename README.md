@@ -2,9 +2,9 @@
 
 > 子非鱼，安知鱼之乐。——《庄子·秋水》
 
-一方池塘作桌面。知鱼是一个可交互的锦鲤池塘动态壁纸（PWA），在浏览器中即开即用，也可安装到桌面全屏运行。
+一方池塘作桌面。知鱼是一个可交互的锦鲤池塘动态壁纸（PWA），在浏览器中即开即用，也可安装到桌面全屏运行，或下载 [Windows 桌面版](#windows-桌面壁纸版) 把池塘铺满真实桌面。
 
-在线体验：<https://erane.github.io/fish/>
+在线体验：<https://erane.github.io/fish/> ｜ Windows 下载：[安装版][setup] · [绿色版][portable]
 
 ## 功能特性
 
@@ -56,7 +56,25 @@ pnpm icons      # 重新生成应用图标
 
 ## Windows 桌面壁纸版
 
-`pnpm tauri build` 产出单个自包含 exe（`src-tauri/target/release/zhiyu.exe`，约 9 MB），双击即用：池塘垫在桌面图标之下铺满全部屏幕，桌面空白处可直接交互，托盘在喂鱼/惊扰/观鱼三种模式间切换（观鱼时点击不惊扰池塘），托盘常驻（打开池塘 / 交互模式 / 开机自启 / 退出），默认开机自启。设计详见 [docs/desktop-wallpaper-design.md](docs/desktop-wallpaper-design.md)，构建环境要求 Rust + MSVC。
+免安装直接用，提供两种形态，链接永远指向最新发布版：
+
+| | 安装版 | 绿色版 |
+| | --- | --- |
+| 下载 | [zhiyu-win-setup.exe][setup] | [zhiyu-win-portable.zip][portable] |
+| 使用 | 双击安装，从开始菜单启动 | 解压到任意文件夹，双击其中 `zhiyu.exe` |
+| 卸载 | 系统「设置 → 应用」中卸载 | 直接删除文件夹 |
+| 适合 | 日常长期使用（推荐大多数用户） | 不想安装软件、或放 U 盘携带演示 |
+
+两版存档（池塘、鱼、皮肤）都保存在系统应用数据目录（`%LOCALAPPDATA%` 下按应用标识 `io.github.erane.zhiyu`），不随程序文件夹走：卸载重装数据保留；绿色版拷去另一台电脑则从空池塘开始。运行依赖 WebView2 运行库：Win11 系统自带，Win10 多随 Edge 自动更新已具备；安装版缺失时会联网自动补装，绿色版需自行安装 WebView2 Runtime。
+
+发布物由 [.github/workflows/release-desktop.yml](.github/workflows/release-desktop.yml) 在推送 `v*` tag 时自动构建并创建 Release（也可在 Actions 页手动触发）。
+
+[setup]: https://github.com/Erane/fish/releases/latest/download/zhiyu-win-setup.exe
+[portable]: https://github.com/Erane/fish/releases/latest/download/zhiyu-win-portable.zip
+
+### 本地构建
+
+`pnpm tauri build` 产出安装版（`src-tauri/target/release/bundle/nsis/`）与自包含绿色 exe（`src-tauri/target/release/zhiyu.exe`，约 9 MB），构建环境要求 Rust + MSVC。桌面行为：池塘垫在桌面图标之下铺满全部屏幕，桌面空白处可直接交互，托盘在喂鱼/惊扰/观鱼三种模式间切换（观鱼时点击不惊扰池塘），托盘常驻（打开池塘 / 交互模式 / 开机自启 / 退出），默认开机自启。设计详见 [docs/desktop-wallpaper-design.md](docs/desktop-wallpaper-design.md)。
 
 ## 项目结构
 
