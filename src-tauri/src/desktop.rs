@@ -107,21 +107,31 @@ pub fn attach(window: &WebviewWindow) -> Result<(), AttachError> {
         "attach: progman={progman:?} screen={:?} hwnd={hwnd:?}",
         virtual_screen()
     ));
-    let mut spawned = false;
+    let mut derived = false;
     let parent = find_worker().or_else(|| {
-        spawned = true;
-        crate::log("attach: 无壁纸层，发送 0x052C 派生");
+        derived = true;
+        let before = worker_windows();
+        crate::log(&format!(
+            "attach: 无壁纸层，发送 0x052C 派生（现有 WorkerW {} 个）",
+            before.len()
+        ));
         unsafe {
             SendMessageW(progman, SPAWN_WORKER_W, Some(WPARAM(0)), Some(LPARAM(0)));
         }
+        let added = worker_windows()
+            .into_iter()
+            .filter(|w| !before.contains(w))
+            .count();
+        crate::log(&format!("attach: 派生新增 WorkerW {added} 个"));
         find_worker()
     });
     let parent = match parent {
         Some(w) => {
-            crate::log(&format!("attach: 挂载目标 {w:?} 来自派生={spawned}"));
+            crate::log(&format!("attach: 挂载目标 {w:?} 派生={derived}"));
             w
         }
         None => {
+            dump_desktop();
             crate::log("attach: 未找到任何壁纸层");
             return Err(AttachError::NoWorker);
         }
@@ -226,36 +236,111 @@ pub fn sink(window: &WebviewWindow) {
 
 fn find_worker() -> Option<HWND> {
     let workers = worker_windows();
-    let host = workers.iter().position(|w| {
-        unsafe { FindWindowExW(Some(*w), None, w!("SHELLDLL_DefView"), None) }.is_ok()
-    });
-    crate::log(&format!(
-        "find_worker: 顶层 WorkerW 数={} DefView 宿主={}",
-        workers.len(),
-        host.map(|i| format!("{:?}", workers[i])).unwrap_or_else(|| "无".into()),
-    ));
+    let host = workers.iter().position(|w| hosts_defview(*w));
     if let Some(found) = pick_worker(&workers, host) {
-        crate::log("find_worker: 命中经典结构（宿主后继）");
+        crate::log("find_worker: 命中经典结构（图标层宿主的后继）");
         return Some(found);
     }
     let progman = unsafe { FindWindowW(w!("Progman"), None) }.ok()?;
-    let mut after = None;
-    loop {
-        let child = match unsafe { FindWindowExW(Some(progman), after, w!("WorkerW"), None) } {
-            Ok(h) => h,
-            Err(_) => break,
-        };
-        if child.0.is_null() {
-            break;
-        }
-        if unsafe { IsWindowVisible(child) }.as_bool() {
-            crate::log("find_worker: 命中 Progman 可见子 WorkerW");
-            return Some(child);
-        }
-        after = Some(child);
+    let in_progman = hosts_defview(progman);
+    if let Some(band) = workers_below(progman).into_iter().find(|w| band_shaped(*w)) {
+        crate::log(&format!(
+            "find_worker: 命中 Progman 之下首个带形 WorkerW（DefView 宿主={}）",
+            if in_progman { "Progman" } else { "不可探测" }
+        ));
+        return Some(band);
+    }
+    if let Some(child) = progman_child_worker(progman) {
+        crate::log("find_worker: 命中 Progman 可见子 WorkerW");
+        return Some(child);
     }
     crate::log("find_worker: 无可用壁纸层");
     None
+}
+
+fn hosts_defview(hwnd: HWND) -> bool {
+    match unsafe { FindWindowExW(Some(hwnd), None, w!("SHELLDLL_DefView"), None) } {
+        Ok(h) => !h.0.is_null(),
+        Err(_) => false,
+    }
+}
+
+fn workers_below(progman: HWND) -> Vec<HWND> {
+    let mut list = Vec::new();
+    let mut after = Some(progman);
+    loop {
+        match unsafe { FindWindowExW(None, after, w!("WorkerW"), None) } {
+            Ok(h) if !h.0.is_null() => {
+                list.push(h);
+                after = Some(h);
+            }
+            _ => break,
+        }
+    }
+    list
+}
+
+fn band_shaped(hwnd: HWND) -> bool {
+    if !unsafe { IsWindowVisible(hwnd) }.as_bool() {
+        return false;
+    }
+    let mut rect = RECT::default();
+    unsafe { GetWindowRect(hwnd, &mut rect) }.is_ok() && covers(rect, virtual_screen())
+}
+
+fn covers(rect: RECT, vs: VirtualScreen) -> bool {
+    rect.left <= vs.x
+        && rect.top <= vs.y
+        && rect.right >= vs.x + vs.w
+        && rect.bottom >= vs.y + vs.h
+}
+
+fn progman_child_worker(progman: HWND) -> Option<HWND> {
+    let mut after = None;
+    loop {
+        match unsafe { FindWindowExW(Some(progman), after, w!("WorkerW"), None) } {
+            Ok(h) if !h.0.is_null() => {
+                if unsafe { IsWindowVisible(h) }.as_bool() {
+                    return Some(h);
+                }
+                after = Some(h);
+            }
+            _ => break,
+        }
+    }
+    None
+}
+
+fn dump_desktop() {
+    let progman = unsafe { FindWindowW(w!("Progman"), None) }.ok();
+    let defview_in_progman = progman.map(hosts_defview).unwrap_or(false);
+    let workers: Vec<String> = worker_windows()
+        .iter()
+        .enumerate()
+        .map(|(i, w)| {
+            let mut rect = RECT::default();
+            let _ = unsafe { GetWindowRect(*w, &mut rect) };
+            format!(
+                "W{i}=({},{},{},{}){}",
+                rect.left,
+                rect.top,
+                rect.right,
+                rect.bottom,
+                if unsafe { IsWindowVisible(*w) }.as_bool() {
+                    "v"
+                } else {
+                    "h"
+                }
+            )
+        })
+        .collect();
+    crate::log(&format!(
+        "dump: Progman={} 宿主DefView={defview_in_progman} {}",
+        progman
+            .map(|p| format!("{p:?}"))
+            .unwrap_or_else(|| "无".into()),
+        workers.join(" ")
+    ));
 }
 
 unsafe extern "system" fn collect_worker(hwnd: HWND, lparam: LPARAM) -> BOOL {
@@ -308,5 +393,75 @@ mod tests {
         assert_eq!(pick_worker(&[a, b], Some(1)), None);
         assert_eq!(pick_worker(&[a, c], None), None);
         assert_eq!(pick_worker(&[], None), None);
+    }
+
+    #[test]
+    fn band_must_fully_cover_virtual_screen() {
+        let vs = VirtualScreen {
+            x: 0,
+            y: 0,
+            w: 1920,
+            h: 1200,
+        };
+        assert!(covers(
+            RECT {
+                left: 0,
+                top: 0,
+                right: 1920,
+                bottom: 1200
+            },
+            vs
+        ));
+        assert!(covers(
+            RECT {
+                left: -100,
+                top: 0,
+                right: 2020,
+                bottom: 1300
+            },
+            vs
+        ));
+        assert!(!covers(
+            RECT {
+                left: 0,
+                top: 0,
+                right: 1920,
+                bottom: 1080
+            },
+            vs
+        ));
+        assert!(!covers(
+            RECT {
+                left: 10,
+                top: 0,
+                right: 1920,
+                bottom: 1200
+            },
+            vs
+        ));
+        let offset = VirtualScreen {
+            x: -1920,
+            y: 0,
+            w: 3840,
+            h: 1080,
+        };
+        assert!(covers(
+            RECT {
+                left: -1920,
+                top: 0,
+                right: 1920,
+                bottom: 1080
+            },
+            offset
+        ));
+        assert!(!covers(
+            RECT {
+                left: 0,
+                top: 0,
+                right: 1920,
+                bottom: 1080
+            },
+            offset
+        ));
     }
 }

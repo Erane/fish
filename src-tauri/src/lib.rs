@@ -91,7 +91,10 @@ fn next_wallpaper_label(app: &AppHandle) -> String {
 
 fn spawn_wallpaper(app: &AppHandle) -> bool {
     let label = next_wallpaper_label(app);
-    log(&format!("创建壁纸窗口 {label}"));
+    log(&format!(
+        "创建壁纸窗口 {label} v{}",
+        app.package_info().version
+    ));
     let built = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
         .title("知鱼")
         .decorations(false)
