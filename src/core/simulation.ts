@@ -1,7 +1,10 @@
 import { BODY, updateSpine } from "./fish.ts";
 import { clamp, TAU, wrap } from "./math.ts";
-import { pushInside, signedDistToPoly } from "./boundary.ts";
-import type { EatEvent, Fish, Food, Obstacle } from "./types.ts";
+import { Field, handed, scanHeading } from "./navigator.ts";
+import type { EatEvent, Fish, Food, Goal, Obstacle } from "./types.ts";
+
+const GOAL_SAMPLES = 8;
+const FOOD_MAX = 180;
 
 export class PondSimulation {
   fish: Fish[];
@@ -38,14 +41,23 @@ export class PondSimulation {
     return this.residentsOn ? this.fish.concat(this.residents) : this.fish;
   }
 
+  get field(): Field {
+    return new Field(this.boundary, this.width, this.height, this.obstacles);
+  }
+
   feed(x: number, y: number, count = 9): boolean {
-    if (this.food.length >= 180) return false;
-    for (let i = 0; i < count && this.food.length < 180; i++) {
+    if (this.food.length >= FOOD_MAX) return false;
+    const field = this.field;
+    const pellet = BODY.length * this.scale;
+    let placed = 0;
+    for (let i = 0; i < count && this.food.length < FOOD_MAX; i++) {
       const a = this.random() * TAU;
       const r = Math.sqrt(this.random()) * 24;
+      const [fx, fy] = field.inside(x + Math.cos(a) * r, y + Math.sin(a) * r, pellet);
+      if (field.clearance(fx, fy) < 0) continue;
       this.food.push({
-        x: clamp(x + Math.cos(a) * r, 15, this.width - 15),
-        y: clamp(y + Math.sin(a) * r, 15, this.height - 15),
+        x: fx,
+        y: fy,
         life: 25,
         age: 0,
         drift: this.random() * 6,
@@ -53,8 +65,9 @@ export class PondSimulation {
         vy: Math.sin(a) * r * 0.8,
         eaten: false,
       });
+      placed++;
     }
-    return true;
+    return placed > 0;
   }
 
   scare(x: number, y: number, radius = 170): void {
@@ -72,69 +85,76 @@ export class PondSimulation {
     }
   }
 
-  pickGoal(f: Fish): void {
+  pickGoal(f: Fish, field: Field): void {
     const r = this.random;
     const w = this.width;
     const h = this.height;
     const m = 0.15;
     const span = Math.min(w, h);
-    let best: { x: number; y: number } | null = null;
+    const need = BODY.length * f.size * this.scale * 0.8;
+    let best: Goal | null = null;
     let score = -Infinity;
-    for (let i = 0; i < 8; i++) {
+    let room: Goal = { x: f.x, y: f.y };
+    let roomClear = field.clearance(f.x * w, f.y * h);
+    for (let i = 0; i < GOAL_SAMPLES; i++) {
       const gx = m + r() * (1 - 2 * m);
       const gy = m + r() * (1 - 2 * m);
+      const clear = field.clearance(gx * w, gy * h);
+      if (clear > roomClear) {
+        roomClear = clear;
+        room = { x: gx, y: gy };
+      }
+      if (clear < need) continue;
       const dx = (gx - f.x) * w;
       const dy = (gy - f.y) * h;
-      const d = Math.hypot(dx, dy);
-      if (this.obstacles.some((o) => Math.hypot(gx * w - o.x, gy * h - o.y) < o.r + 40)) continue;
-      if (
-        this.boundary &&
-        signedDistToPoly(gx * w, gy * h, this.boundary) < BODY.length * f.size * this.scale * 0.8
-      )
-        continue;
       const sc =
         -Math.abs(wrap(Math.atan2(dy, dx) - f.angle)) * 1.2 +
-        (Math.min(d, span * 0.6) / span) * 2 +
+        (Math.min(Math.hypot(dx, dy), span * 0.6) / span) * 2 +
         r() * 0.6;
       if (sc > score) {
         score = sc;
         best = { x: gx, y: gy };
       }
     }
-    f.goal = best ?? { x: 0.5, y: 0.5 };
+    f.goal = best ?? room;
     f.goalTime = 7 + r() * 12;
   }
 
   step(dt: number, speedFactor = 1): void {
     dt = clamp(dt, 0, 0.05);
     this.time += dt;
-    const w = this.width;
-    const h = this.height;
+    const field = this.field;
+    const pellet = BODY.length * this.scale;
     for (const p of this.food) {
       p.life -= dt;
       p.age += dt;
       const k = Math.exp(-dt * 1.8);
       p.vx *= k;
       p.vy *= k;
-      p.x = clamp(p.x + (p.vx + Math.sin(this.time * 0.35 + p.drift) * 1.2) * dt, 8, w - 8);
-      p.y = clamp(p.y + (p.vy + Math.cos(this.time * 0.29 + p.drift * 1.3) * 1.2) * dt, 8, h - 8);
+      const [px, py] = field.inside(
+        p.x + (p.vx + Math.sin(this.time * 0.35 + p.drift) * 1.2) * dt,
+        p.y + (p.vy + Math.cos(this.time * 0.29 + p.drift * 1.3) * 1.2) * dt,
+        pellet,
+      );
+      p.x = px;
+      p.y = py;
     }
     this.food = this.food.filter((p) => p.life > 0 && !p.eaten);
     const sdt = dt * clamp(speedFactor, 0.1, 3);
     const neighbours = this.allFish;
-    for (const f of neighbours) this.swim(f, sdt, neighbours);
+    for (const f of neighbours) this.swim(f, sdt, field, neighbours);
     if (this.food.some((p) => p.eaten)) this.food = this.food.filter((p) => !p.eaten);
   }
 
-  swim(f: Fish, dt: number, neighbours: Fish[] = this.allFish): void {
+  swim(f: Fish, dt: number, field: Field, neighbours: Fish[]): void {
     const w = this.width;
     const h = this.height;
     const s = f.size * this.scale;
     const L = BODY.length * s;
     const random = this.random;
     const silver = f.species === "silvercarp";
-    let x = f.x * w;
-    let y = f.y * h;
+    const x = f.x * w;
+    const y = f.y * h;
     const cos = Math.cos(f.angle);
     const sin = Math.sin(f.angle);
     const mx = x + cos * BODY.nose * s;
@@ -157,7 +177,6 @@ export class PondSimulation {
     let turnGain = silver ? 3.5 : 2;
     let maxTurn = silver ? 2.4 : 1.3;
     let sepW = 2.4;
-    let boundW = 3;
     f.flee = Math.max(0, f.flee - dt);
     if (f.flee > 0) {
       gx = Math.cos(f.fleeAngle);
@@ -185,7 +204,6 @@ export class PondSimulation {
       turnGain = 4.5;
       maxTurn = 3.4;
       sepW = 1.1;
-      boundW = 0.8;
       f.depthGoal = 0.04;
       if (fd < Math.max(6, 7 * s)) {
         fx.eaten = true;
@@ -196,7 +214,7 @@ export class PondSimulation {
     } else {
       f.goalTime -= dt;
       if (!f.goal || f.goalTime <= 0 || Math.hypot(f.goal.x * w - x, f.goal.y * h - y) < L * 1.3)
-        this.pickGoal(f);
+        this.pickGoal(f, field);
       const goal = f.goal!;
       const a =
         Math.atan2(goal.y * h - y, goal.x * w - x) +
@@ -259,46 +277,18 @@ export class PondSimulation {
       ax /= al;
       ay /= al;
     }
-    const lx = x + cos * L * 1.2;
-    const ly = y + sin * L * 1.2;
-    let bx = 0;
-    let by = 0;
-    if (this.boundary) {
-      const M = L * 1.2 + 12;
-      const sd = signedDistToPoly(lx, ly, this.boundary);
-      if (sd < M) {
-        const [tx, ty] = pushInside(lx, ly, this.boundary, M);
-        const dl = Math.hypot(tx - lx, ty - ly) || 1;
-        const k = clamp(1 - sd / M, 0, 1) * 1.6;
-        bx += ((tx - lx) / dl) * k;
-        by += ((ty - ly) / dl) * k;
-      }
-    } else {
-      const mX = Math.min(w * 0.1 + L * 0.3, w * 0.3);
-      const mY = Math.min(h * 0.1 + L * 0.3, h * 0.3);
-      if (lx < mX) bx = (mX - lx) / mX;
-      else if (lx > w - mX) bx = (w - mX - lx) / mX;
-      if (ly < mY) by = (mY - ly) / mY;
-      else if (ly > h - mY) by = (h - mY - ly) / mY;
-    }
-    for (const ob of this.obstacles)
-      for (const [px, py, R] of [
-        [lx, ly, ob.r + L * 0.4],
-        [x, y, ob.r + L * 0.2],
-      ]) {
-        const dx = px - ob.x;
-        const dy = py - ob.y;
-        const d = Math.hypot(dx, dy) || 1;
-        if (d < R) {
-          const k = (1 - d / R) * 2.5;
-          bx += (dx / d) * k;
-          by += (dy / d) * k;
-        }
-      }
+    const head = scanHeading(field, x, y, f.angle, L, handed(f.seed));
+    const block = head.block;
+    const tx = gx + sx * sepW + ax * 0.15;
+    const ty = gy + sy * sepW + ay * 0.15;
+    const tl = Math.hypot(tx, ty) || 1;
     const desired = Math.atan2(
-      gy + sy * sepW + ay * 0.15 + by * boundW,
-      gx + sx * sepW + ax * 0.15 + bx * boundW,
+      (ty / tl) * (1 - block) + head.y * block,
+      (tx / tl) * (1 - block) + head.x * block,
     );
+    turnGain += block * 6;
+    maxTurn *= 1 + 2.2 * block;
+    want *= 1 - 0.6 * block;
     f.turn +=
       (clamp(wrap(desired - f.angle) * turnGain, -maxTurn, maxTurn) - f.turn) *
       Math.min(1, dt * (f.flee > 0 ? 14 : silver ? 7 : 4));
@@ -324,16 +314,13 @@ export class PondSimulation {
         Math.min(0.4, Math.abs(f.turn) * 0.25) -
         f.amp) *
       Math.min(1, dt * 3);
-    x += Math.cos(f.angle) * f.v * dt;
-    y += Math.sin(f.angle) * f.v * dt;
-    if (this.boundary) {
-      const [px, py] = pushInside(x, y, this.boundary, L * 0.55);
-      f.x = px / w;
-      f.y = py / h;
-    } else {
-      f.x = clamp(x / w, 0.03, 0.97);
-      f.y = clamp(y / h, 0.035, 0.965);
-    }
+    const [px, py] = field.inside(
+      x + Math.cos(f.angle) * f.v * dt,
+      y + Math.sin(f.angle) * f.v * dt,
+      L,
+    );
+    f.x = px / w;
+    f.y = py / h;
     f.depth += (f.depthGoal - f.depth) * Math.min(1, dt * (food ? 1.2 : 0.35));
     updateSpine(f, s, w, h);
   }

@@ -56,7 +56,11 @@ export function signedDistToPoly(x: number, y: number, poly: number[]): number {
 
 export function pushInside(x: number, y: number, poly: number[], margin: number): [number, number] {
   const c = closestOnPoly(x, y, poly);
-  const signed = pointInPoly(x, y, poly) ? c.d : -c.d;
-  if (signed >= margin) return [x, y];
+  const d = pointInPoly(x, y, poly) ? c.d : -c.d;
+  if (d >= margin) return [x, y];
+  if (d > 1e-3) {
+    const k = margin / d;
+    return [c.x + (x - c.x) * k, c.y + (y - c.y) * k];
+  }
   return [c.x + c.nx * margin, c.y + c.ny * margin];
 }
