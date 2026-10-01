@@ -9,12 +9,21 @@ describe("lookFor", () => {
     for (const w of WEATHERS) expect(lookFor(w, false).moon).toBe(0);
   });
 
-  it("lets cloud cover alone decide how much moon survives at night", () => {
+  it("runs the whole moon amplitude through cloud gating", () => {
     for (const w of WEATHERS) expect(lookFor(w, true).moon).toBe(1);
   });
 
   it("saturates the cloud field when the sky is fully overcast", () => {
     expect(lookFor("rain", true, 1).cloudCover).toBeGreaterThanOrEqual(0.85);
+  });
+
+  it("keeps a light rain below the saturation threshold so the sky still has gaps", () => {
+    const c = [0, 0.5, 1].map((k) => lookFor("rain", false, k).cloudCover);
+    expect(c[0]!).toBeLessThan(0.85);
+    expect(c[1]!).toBeLessThan(0.85);
+    expect(c[2]!).toBeGreaterThanOrEqual(0.85);
+    expect(c[1]!).toBeGreaterThan(c[0]!);
+    expect(c[2]!).toBeGreaterThan(c[1]!);
   });
 
   it("keeps the calm bed light baseline for every weather but rain", () => {
@@ -48,6 +57,17 @@ describe("lookFor", () => {
     for (const k of [0, 0.5, 1]) expect(lookFor("rain", true, k).moonFloor).toBe(0);
     for (const w of WEATHERS)
       expect(lookFor(w, false, 0.5, 0.5).moonFloor).toBeGreaterThanOrEqual(0);
+  });
+
+  it("floors the surface sheen only where the cloud deck is thick enough to need one", () => {
+    for (const w of ["rain", "snow"] as Weather[]) {
+      const l = lookFor(w, true, 1, 1);
+      expect(l.sheenFloor).toBeGreaterThan(0);
+      expect(l.sheenFloor).toBeLessThan(1);
+    }
+    for (const w of ["sunny", "cloudy"] as Weather[]) expect(lookFor(w, true).sheenFloor).toBe(0);
+    for (const w of WEATHERS)
+      expect(lookFor(w, false).sheenFloor).toBe(lookFor(w, true).sheenFloor);
   });
 
   it("maps rain to a stepped curve that stays below the sunny surface energy", () => {

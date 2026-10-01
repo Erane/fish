@@ -167,7 +167,7 @@ export const FS_FINAL = `#version 300 es
 precision highp float;
 uniform sampler2D uScene, uSurface, uFloat, uNoise, uCloud, uWater;
 uniform vec4 uMoonDisc; uniform vec3 uBedU, uBedV; uniform vec2 uView;
-uniform float uRefract, uGlint, uSkyK, uVignette, uMoon, uMoonFloor, uBright, uSat, uShade, uTime, uCloudShade, uMist, uFlash, uGrain;
+uniform float uRefract, uGlint, uSkyK, uVignette, uMoon, uMoonFloor, uSheenFloor, uBright, uSat, uShade, uTime, uCloudShade, uMist, uFlash, uGrain;
 uniform vec3 uGlintColor, uSky, uTint, uSun;
 in vec2 vUv; out vec4 o;
 float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -198,15 +198,15 @@ void main(){
     float face = (1. - .24 * min(maria, 1.)) * (.9 + .16 * texture(uNoise, d * .5 + .37).r);
     float disc = (1. - smoothstep(.93, 1.03, r)) * mix(.05, 1., lit) * face * (1. - .18 * r * r) * clamp(1. + dot(-g, vec2(-.6, .6)) * 1.4, .35, 1.6);
     crisp += vec3(.93, .92, .86) * disc * .78;
-    night += vec3(.6, .72, 1.) * (exp(-r * r / 6.) * .2 + exp(-r / 3.5) * .08) * (.3 + .7 * illum);
+    vec3 halo = vec3(.6, .72, 1.) * (exp(-r * r / 6.) * .2 + exp(-r / 3.5) * .08) * (.3 + .7 * illum);
     glint *= (.3 + exp(-length((px - uMoonDisc.xy) / uMoonDisc.z) / 5.) * 1.3) * (.3 + .7 * illum);
     vec2 cell = floor(rp / 38.), f = fract(rp / 38.) - .5, sp = vec2(hash(cell + 3.1), hash(cell + 7.7)) - .5;
     float h = hash(cell), q = dot(f - sp * .7, f - sp * .7);
     if (h > .965) crisp += vec3(.8, .86, 1.) * exp(-q * 420.) * (.55 + .45 * sin(uTime * (1. + h * 3.) + h * 40.)) * (.6 + 3. * (h - .965));
     vec2 toMoon = normalize(uMoonDisc.xy - px + 1e-4);
     float reach = exp(-length(px - uMoonDisc.xy) / (uMoonDisc.z * 16.));
-    night += vec3(.55, .66, .9) * (max(0., dot(-g, toMoon)) * .6 + length(g) * .14) * (.35 + .65 * reach) * (.4 + .6 * illum);
-    night = (night * max(uMoonFloor, clear) + (crisp + glint) * clear) * uMoon * wt;
+    vec3 sheen = vec3(.55, .66, .9) * (max(0., dot(-g, toMoon)) * .6 + length(g) * .14) * (.35 + .65 * reach) * (.4 + .6 * illum);
+    night = (halo * max(uMoonFloor, clear) + (sheen + glint) * max(uSheenFloor, clear) + crisp * clear) * uMoon * wt;
     glint = vec3(0.);
   }
   col += glint;

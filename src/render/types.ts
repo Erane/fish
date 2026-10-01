@@ -28,6 +28,7 @@ export interface Look {
   water: Vec3;
   moon: number;
   moonFloor: number;
+  sheenFloor: number;
   mist: number;
   depth: number;
   posterize: number;

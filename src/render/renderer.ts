@@ -620,6 +620,7 @@ export function createRenderer(
     gl.uniform1f(p.u("uVignette"), env.vignette);
     gl.uniform1f(p.u("uMoon"), env.moon);
     gl.uniform1f(p.u("uMoonFloor"), env.moonFloor);
+    gl.uniform1f(p.u("uSheenFloor"), env.sheenFloor);
     gl.uniform1f(p.u("uBright"), env.bright);
     gl.uniform1f(p.u("uSat"), env.sat);
     gl.uniform1f(p.u("uShade"), env.shade);
