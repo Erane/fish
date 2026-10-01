@@ -14,7 +14,12 @@ interface Harness {
   bumps: number;
 }
 
-function makeFeeder(mode: Interaction, feedResult: boolean, foodCount = 0): Harness {
+function makeFeeder(
+  mode: Interaction,
+  feedResult: boolean,
+  foodCount = 0,
+  boundary: number[] | null = null,
+): Harness {
   const h: Harness = {
     feeder: undefined as unknown as Feeder,
     drops: [],
@@ -32,6 +37,7 @@ function makeFeeder(mode: Interaction, feedResult: boolean, foodCount = 0): Harn
   const food: { x: number; y: number }[] = [];
   const sim = {
     food,
+    boundary,
     feed: (x: number, y: number) => {
       if (!feedResult) return false;
       for (let i = 0; i < foodCount; i++) food.push({ x, y });
@@ -76,6 +82,25 @@ describe("Feeder", () => {
     expect(h.taps).toBe(1);
     expect(h.drops).toHaveLength(1);
     expect(h.bumps).toBe(0);
+  });
+
+  it("池塘外点击：无任何反应", () => {
+    const h = makeFeeder("feed", true, 2, [0, 0, 100, 0, 100, 100, 0, 100]);
+    const outcome = h.feeder.feedAt(200, 200);
+    expect(outcome).toBe("ignored");
+    expect(h.startles).toBe(0);
+    expect(h.drops).toHaveLength(0);
+    expect(h.scares).toHaveLength(0);
+    expect(h.taps).toBe(0);
+    expect(h.plops).toBe(0);
+    expect(h.bumps).toBe(0);
+  });
+
+  it("有边界时池塘内点击仍正常", () => {
+    const h = makeFeeder("startle", true, 0, [0, 0, 100, 0, 100, 100, 0, 100]);
+    const outcome = h.feeder.feedAt(10, 20);
+    expect(outcome).toBe("startled");
+    expect(h.scares).toEqual([{ x: 10, y: 20 }]);
   });
 
   it("观鱼模式：点击无任何水面反应", () => {

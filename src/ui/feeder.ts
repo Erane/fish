@@ -1,4 +1,5 @@
 import type { PondAudio } from "../audio/pondAudio.ts";
+import { pointInPoly } from "../core/boundary.ts";
 import type { PondSimulation } from "../core/simulation.ts";
 import type { Interaction } from "../core/types.ts";
 import type { Persister } from "../data/persist.ts";
@@ -29,6 +30,7 @@ export class Feeder {
 
   feedAt(x: number, y: number): FeedOutcome {
     if (this.mode === "watch") return "ignored";
+    if (this.sim.boundary && !pointInPoly(x, y, this.sim.boundary)) return "ignored";
     const scale = this.scene.scale;
     this.scene.startle(x, y);
     if (this.mode === "startle") {
