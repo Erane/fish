@@ -93,13 +93,36 @@ export const loadSkin = (id: string): Promise<SkinRecord | undefined> => get<Ski
 export const writeSkin = (record: SkinRecord): Promise<void> => put(SKINS, record.id, record);
 export const deleteSkin = (id: string): Promise<void> => del(SKINS, id);
 
-export const loadSeededThemes = async (): Promise<string[]> => {
-  const list = await get<string[]>(STATE, SEEDED_KEY);
-  return Array.isArray(list) ? list : [];
+export interface SeededTheme {
+  url: string;
+  id: string;
+}
+
+export const normalizeSeededThemes = (raw: unknown): SeededTheme[] =>
+  Array.isArray(raw)
+    ? raw.filter(
+        (v): v is SeededTheme =>
+          !!v &&
+          typeof v === "object" &&
+          typeof (v as SeededTheme).url === "string" &&
+          !!(v as SeededTheme).url &&
+          typeof (v as SeededTheme).id === "string" &&
+          !!(v as SeededTheme).id,
+      )
+    : [];
+
+export const loadSeededThemes = async (): Promise<SeededTheme[]> =>
+  normalizeSeededThemes(await get<unknown>(STATE, SEEDED_KEY));
+
+export const addSeededTheme = async (mark: SeededTheme): Promise<void> => {
+  const list = (await loadSeededThemes()).filter((v) => v.url !== mark.url);
+  await put(STATE, SEEDED_KEY, [...list, mark]);
 };
 
-export const addSeededTheme = async (url: string): Promise<void> => {
-  const list = await loadSeededThemes();
-  if (list.includes(url)) return;
-  await put(STATE, SEEDED_KEY, [...list, url]);
+export const removeSeededTheme = async (url: string): Promise<void> => {
+  await put(
+    STATE,
+    SEEDED_KEY,
+    (await loadSeededThemes()).filter((v) => v.url !== url),
+  );
 };

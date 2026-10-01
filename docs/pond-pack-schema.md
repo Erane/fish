@@ -36,8 +36,8 @@
 - IDB `pond`（v3）：`packs` store 存 `PondPack` JSON，`assets` store 存底图 Blob（键 = `image` 字段值），`skins` store 存 `SkinRecord`（皮肤 Blob 加名称物种）。见 `src/data/db.ts`。
 - 当前启用哪个包、绑哪些皮肤：`save.packId` 与 `save.skinBindings`（均在 `src/core/save.ts` 清洗）。缺省或加载失败则用内置默认池塘与程序化锦鲤。
 - 导入 / 启用 / 编辑 / 删除入口：顶栏「池塘」面板（`src/ui/panels.ts` 的 `renderPond`）。底图资产 id 由 `seasonAssetId()` 生成（`src/data/packs.ts`），即 `asset-{packId}-{season}`；同 `id` 再次导入即更新该包——JSON 里没选图的季节保留原有资产，JSON 里删掉的季节其资产随之清理（`planSeasonAssets()`）。
-- 内置主题：清单 `BUILTIN_THEMES`（`src/data/builtinPacks.ts`）指向 `public/theme/` 下的包 JSON 与底图，首启由 `seedBuiltinPacks()` 走 `importPack()` 落成普通包，面板上与用户导入的包无异（可换图、可删除）。播种按主题 url 记账在 IDB `state.seededThemes`，与包 id 无关，故删除后不复活；记账只在播种成功后写入，取数或导入失败下次启动重试。默认启用规则见 `src/main.ts` 的 `boot`：存档已显式选包则保留，否则启用本次新播的第一个包。
-- `public/theme/**` 不进 PWA precache（`vite.config.ts` 的 `workbox.globIgnores`）：底图首启即复制进 IDB，无需常驻缓存。
+- 内置主题：清单 `public/theme/themes.json` 是上架配置的唯一真相源——在清单即上架，删行即下架，无独立开关字段。`src/data/builtinPacks.ts` 负责拉取校验（`parseThemeManifest()`/`loadBuiltinThemes()`）与播种回收：首启由 `seedBuiltinPacks()` 走 `importPack()` 落成普通包，面板上与用户导入的包无异（可换图、可删除）；清单外已播种的主题连同底图资产在启动时自动回收，记账按 url+包 id 存于 IDB `state.seededThemes`（`src/data/db.ts`），故面板手动删除后不复活；记账只在播种成功后写入，取数或导入失败下次启动重试。清单拉取失败或结构非法视为配置状态未知，播种与回收都不执行，避免离线误删。默认启用规则见 `src/main.ts` 的 `boot`：仅无存档的首次启动启用本次新播的第一个包；已有存档则尊重其选择，所选包已被回收时回退默认池塘且回退结果随存档保留。
+- `public/theme/**` 不进 PWA precache，仅清单 `theme/themes.json` 例外重包含（`vite.config.ts` 的 `workbox.globIgnores`）：底图首启即复制进 IDB，无需常驻缓存；清单必须离线可读，否则上面那条「状态未知」语义会在离线时跳过播种。
 
 ## 画风
 

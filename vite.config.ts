@@ -33,7 +33,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png}"],
-        globIgnores: ["**/theme/**"],
+        globIgnores: ["**/theme/**", "!**/theme/themes.json"],
         navigateFallback: "index.html",
         runtimeCaching: [
           {

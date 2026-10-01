@@ -1,0 +1,9 @@
+{
+  "themes": [
+    { "url": "theme/autumn.json", "images": { "autumn": "theme/autumn.png" } },
+    {
+      "url": "theme/autumn-chinese-pond.json",
+      "images": { "autumn": "theme/autumn-chinese-pond.png" }
+    }
+  ]
+}
