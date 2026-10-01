@@ -18,6 +18,9 @@ src-tauri/gen
 # Throwaway working docs and visual-verification harnesses
 .tmp/
 
+# AI-generated reference images kept locally while crafting themes
+vibe_images/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
