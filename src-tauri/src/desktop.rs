@@ -110,20 +110,7 @@ pub fn attach(window: &WebviewWindow) -> Result<(), AttachError> {
     let mut derived = false;
     let parent = find_worker().or_else(|| {
         derived = true;
-        let before = worker_windows();
-        crate::log(&format!(
-            "attach: 无壁纸层，发送 0x052C 派生（现有 WorkerW {} 个）",
-            before.len()
-        ));
-        unsafe {
-            SendMessageW(progman, SPAWN_WORKER_W, Some(WPARAM(0)), Some(LPARAM(0)));
-        }
-        let added = worker_windows()
-            .into_iter()
-            .filter(|w| !before.contains(w))
-            .count();
-        crate::log(&format!("attach: 派生新增 WorkerW {added} 个"));
-        find_worker()
+        spawn_worker(progman)
     });
     let parent = match parent {
         Some(w) => {
@@ -234,6 +221,32 @@ pub fn sink(window: &WebviewWindow) {
     }
 }
 
+fn spawn_worker(progman: HWND) -> Option<HWND> {
+    let attempts = [("普通", 0usize, 0isize), ("强制", 0xD, 1)];
+    for (label, wparam, lparam) in attempts {
+        let before = worker_layers(progman);
+        unsafe {
+            SendMessageW(
+                progman,
+                SPAWN_WORKER_W,
+                Some(WPARAM(wparam)),
+                Some(LPARAM(lparam)),
+            );
+        }
+        let added = worker_layers(progman)
+            .into_iter()
+            .filter(|w| !before.contains(w))
+            .count();
+        crate::log(&format!(
+            "attach: {label}派生 0x052C({wparam:#x},{lparam}) 新增 WorkerW {added} 个"
+        ));
+        if let Some(layer) = find_worker() {
+            return Some(layer);
+        }
+    }
+    None
+}
+
 fn find_worker() -> Option<HWND> {
     let workers = worker_windows();
     let host = workers.iter().position(|w| hosts_defview(*w));
@@ -250,7 +263,10 @@ fn find_worker() -> Option<HWND> {
         ));
         return Some(band);
     }
-    if let Some(child) = progman_child_worker(progman) {
+    if let Some(child) = progman_child_workers(progman)
+        .into_iter()
+        .find(|w| unsafe { IsWindowVisible(*w) }.as_bool())
+    {
         crate::log("find_worker: 命中 Progman 可见子 WorkerW");
         return Some(child);
     }
@@ -295,20 +311,25 @@ fn covers(rect: RECT, vs: VirtualScreen) -> bool {
         && rect.bottom >= vs.y + vs.h
 }
 
-fn progman_child_worker(progman: HWND) -> Option<HWND> {
+fn progman_child_workers(progman: HWND) -> Vec<HWND> {
+    let mut list = Vec::new();
     let mut after = None;
     loop {
         match unsafe { FindWindowExW(Some(progman), after, w!("WorkerW"), None) } {
             Ok(h) if !h.0.is_null() => {
-                if unsafe { IsWindowVisible(h) }.as_bool() {
-                    return Some(h);
-                }
+                list.push(h);
                 after = Some(h);
             }
             _ => break,
         }
     }
-    None
+    list
+}
+
+fn worker_layers(progman: HWND) -> Vec<HWND> {
+    let mut list = worker_windows();
+    list.extend(progman_child_workers(progman));
+    list
 }
 
 fn dump_desktop() {
