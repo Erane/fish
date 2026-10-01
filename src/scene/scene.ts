@@ -292,9 +292,10 @@ export class PondScene {
     this.look.wetCover = this.wetCover;
     this.look.rainK = weather === "rain" ? rainK : 0;
 
+    const rainK2 = rainK * rainK;
     const rainN =
       weather === "rain" && !this.calm
-        ? Math.round((30 + 190 * rainK) * Math.min(1, (w * h) / 1.2e6) + 20)
+        ? Math.round((30 + 190 * rainK2) * Math.min(1, (w * h) / 1.2e6) + 20)
         : 0;
     while (this.rain.length < rainN) {
       const z = Math.pow(Math.random(), 1.8);
@@ -316,7 +317,7 @@ export class PondScene {
       }
     }
     if (weather === "rain" && !this.calm) {
-      let n = dt * (10 + 80 * rainK) * Math.min(1.6, (w * h) / 1e6);
+      let n = dt * (6 + 70 * rainK2) * Math.min(1.6, (w * h) / 1e6);
       while (n > 0) {
         if (Math.random() < n) {
           const x = Math.random() * w;
@@ -325,7 +326,7 @@ export class PondScene {
             x,
             y,
             (3 + Math.random() * 3) * scale,
-            (0.2 + Math.random() * 0.3) * (0.7 + 0.5 * rainK),
+            (0.2 + Math.random() * 0.3) * (0.55 + 0.35 * rainK),
           );
           if (Math.random() < 0.4) this.splash(x, y, 0.5 + Math.random() * 0.4);
         }
@@ -540,7 +541,7 @@ export class PondScene {
     const scale = this.scale;
     const rk = look.rainK;
     for (const d of this.rain) {
-      const a = (0.07 + 0.2 * d.z) * (0.75 + 0.5 * rk);
+      const a = (0.09 + 0.24 * d.z) * (0.75 + 0.5 * rk);
       R.sprite(
         "air",
         R.sprites.streak!,
@@ -549,24 +550,19 @@ export class PondScene {
         -0.12 - rk * 0.06,
         0.7 + 0.7 * d.z,
         d.l * (0.4 + 0.25 * rk) * scale,
-        [0.9 * a, 0.95 * a, a, a],
+        [0.9, 0.95, 1, a],
       );
     }
     for (const p of this.splashes) {
       const t = p.age / p.life;
       if (p.ring) {
         const r = p.s * (0.25 + 0.75 * Math.sqrt(t));
-        const a = Math.pow(1 - t, 1.6) * 0.45;
-        R.sprite("surface", R.sprites.ring!, p.x, p.y, 0, r, r * 0.9, [
-          lit[0] * a,
-          lit[1] * a,
-          lit[2] * a,
-          a,
-        ]);
+        const a = Math.pow(1 - t, 1.6) * 0.28;
+        R.sprite("surface", R.sprites.ring!, p.x, p.y, 0, r, r * 0.9, [lit[0], lit[1], lit[2], a]);
       } else {
-        const a = (1 - t) * 0.8;
+        const a = (1 - t) * 0.5;
         const r = p.s * 0.16 * (1 - t * 0.4);
-        R.sprite("air", R.sprites.dot!, p.x, p.y, 0, r, r, [a, a, a, a]);
+        R.sprite("air", R.sprites.dot!, p.x, p.y, 0, r, r, [1, 1, 1, a]);
       }
     }
     for (const f of this.snow) {

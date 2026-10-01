@@ -11,6 +11,7 @@ export interface Look {
   tint: Vec3;
   caustic: number;
   causticTint: Vec3;
+  causticFloor: number;
   glint: number;
   glintColor: Vec3;
   sky: Vec3;
@@ -20,11 +21,13 @@ export interface Look {
   wave: number;
   refract: number;
   ripple: number;
+  rippleDamp: number;
   shade: number;
   shadow: number;
   vignette: number;
   water: Vec3;
   moon: number;
+  moonFloor: number;
   mist: number;
   depth: number;
   posterize: number;

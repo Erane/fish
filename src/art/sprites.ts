@@ -126,7 +126,7 @@ function pelletSprite(): SpriteDef {
 function streakSprite(): SpriteDef {
   const c = canvas(10, 90);
   const ctx = c.getContext("2d")!;
-  ctx.fillStyle = "rgba(240,246,250,.5)";
+  ctx.fillStyle = "rgba(240,246,250,.75)";
   ctx.beginPath();
   ctx.moveTo(4.4, 0);
   ctx.lineTo(5.6, 0);

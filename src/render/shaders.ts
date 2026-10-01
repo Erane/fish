@@ -79,7 +79,7 @@ void main(){
 export const FS_BED = `#version 300 es
 precision highp float;
 uniform sampler2D uBed, uShadow, uCaustic, uFloat, uCloud, uDepth, uWater;
-uniform vec3 uBedU, uBedV, uDeepTint, uCausticTint, uPaper; uniform vec2 uFloatShift, uShadowTexel; uniform float uCausticK, uShadowK, uDepthK, uBedLod, uBedSoft, uPosterize, uPosterMix, uPaperMix, uPaperLift;
+uniform vec3 uBedU, uBedV, uDeepTint, uCausticTint, uPaper; uniform vec2 uFloatShift, uShadowTexel; uniform float uCausticK, uCausticFloor, uShadowK, uDepthK, uBedLod, uBedSoft, uPosterize, uPosterMix, uPaperMix, uPaperLift;
 in vec2 vUv; out vec4 o;
 ${BED}
 float shadowAt(vec2 uv, float lod){
@@ -97,7 +97,7 @@ void main(){
   float sun = 1. - texture(uCloud, vUv).r;
   float sh = max(shadowAt(vUv, .3 + (1. - sun) * 1.7), textureLod(uFloat, b - uFloatShift, 2. + (1. - sun)).g * .6) * mix(.42, 1., sun);
   c *= 1. - sh * uShadowK * vec3(1., .86, .72);
-  c += texture(uCaustic, vUv).r * uCausticK * uCausticTint * (1. - sh) * mix(.06, 1., sun * sun) * (1. - dep * .55) * wt;
+  c += texture(uCaustic, vUv).r * uCausticK * uCausticTint * (1. - sh) * mix(uCausticFloor, 1., sun * sun) * (1. - dep * .55) * wt;
   o = vec4(c, 1.);
 }`;
 
@@ -167,7 +167,7 @@ export const FS_FINAL = `#version 300 es
 precision highp float;
 uniform sampler2D uScene, uSurface, uFloat, uNoise, uCloud, uWater;
 uniform vec4 uMoonDisc; uniform vec3 uBedU, uBedV; uniform vec2 uView;
-uniform float uRefract, uGlint, uSkyK, uVignette, uMoon, uBright, uSat, uShade, uTime, uCloudShade, uMist, uFlash, uGrain;
+uniform float uRefract, uGlint, uSkyK, uVignette, uMoon, uMoonFloor, uBright, uSat, uShade, uTime, uCloudShade, uMist, uFlash, uGrain;
 uniform vec3 uGlintColor, uSky, uTint, uSun;
 in vec2 vUv; out vec4 o;
 float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -183,8 +183,9 @@ void main(){
   col *= (1. - dim) * (1. + dot(-g, normalize(uSun.xy)) * uShade * (1. - cloud * .6));
   col = mix(col * vec3(1.025, 1.01, .98), vec3(dot(col, vec3(.299, .587, .114))) * vec3(.93, .99, 1.07), min(1., dim * 1.1));
   col = mix(col, uSky, clamp(uSkyK * wt * (1. + length(g) * 5.) + dim * .06, 0., .6));
-  vec3 glint = uGlintColor * sf.b * 2.4 * uGlint * (1. - cloud * .92) * wt, night = vec3(0.);
+  vec3 glint = uGlintColor * sf.b * 2.4 * uGlint * (1. - cloud * .92) * wt, night = vec3(0.), crisp = vec3(0.);
   if (uMoon > 0.) {
+    float clear = pow(1. - cloud, 3.);
     vec2 px = vUv * uView, rp = px + g * 22., d = (rp - uMoonDisc.xy) / uMoonDisc.z;
     float r = length(d), s = sqrt(max(0., 1. - d.y * d.y)), k = cos(uMoonDisc.w), illum = .5 - .5 * k;
     float lit = uMoonDisc.w < 3.14159 ? smoothstep(k * s - .07, k * s + .07, d.x) : smoothstep(-k * s + .07, -k * s - .07, d.x);
@@ -196,15 +197,16 @@ void main(){
     maria += 1. - smoothstep(.08, .2, length(d - vec2(-.08, -.4)));
     float face = (1. - .24 * min(maria, 1.)) * (.9 + .16 * texture(uNoise, d * .5 + .37).r);
     float disc = (1. - smoothstep(.93, 1.03, r)) * mix(.05, 1., lit) * face * (1. - .18 * r * r) * clamp(1. + dot(-g, vec2(-.6, .6)) * 1.4, .35, 1.6);
-    night += vec3(.93, .92, .86) * disc * .78 + vec3(.6, .72, 1.) * (exp(-r * r / 6.) * .2 + exp(-r / 3.5) * .08) * (.3 + .7 * illum);
+    crisp += vec3(.93, .92, .86) * disc * .78;
+    night += vec3(.6, .72, 1.) * (exp(-r * r / 6.) * .2 + exp(-r / 3.5) * .08) * (.3 + .7 * illum);
     glint *= (.3 + exp(-length((px - uMoonDisc.xy) / uMoonDisc.z) / 5.) * 1.3) * (.3 + .7 * illum);
     vec2 cell = floor(rp / 38.), f = fract(rp / 38.) - .5, sp = vec2(hash(cell + 3.1), hash(cell + 7.7)) - .5;
     float h = hash(cell), q = dot(f - sp * .7, f - sp * .7);
-    if (h > .965) night += vec3(.8, .86, 1.) * exp(-q * 420.) * (.55 + .45 * sin(uTime * (1. + h * 3.) + h * 40.)) * (.6 + 3. * (h - .965));
+    if (h > .965) crisp += vec3(.8, .86, 1.) * exp(-q * 420.) * (.55 + .45 * sin(uTime * (1. + h * 3.) + h * 40.)) * (.6 + 3. * (h - .965));
     vec2 toMoon = normalize(uMoonDisc.xy - px + 1e-4);
     float reach = exp(-length(px - uMoonDisc.xy) / (uMoonDisc.z * 16.));
     night += vec3(.55, .66, .9) * (max(0., dot(-g, toMoon)) * .6 + length(g) * .14) * (.35 + .65 * reach) * (.4 + .6 * illum);
-    night = (night + glint) * uMoon * (1. - cloud * .9) * wt;
+    night = (night * max(uMoonFloor, clear) + (crisp + glint) * clear) * uMoon * wt;
     glint = vec3(0.);
   }
   col += glint;

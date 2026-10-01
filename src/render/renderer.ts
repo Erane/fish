@@ -492,7 +492,7 @@ export function createRenderer(
       const p = P.sim;
       gl.useProgram(p.p);
       gl.uniform2f(p.u("uTexel"), 1 / state.simW, 1 / state.simH);
-      gl.uniform1f(p.u("uDamp"), 0.994);
+      gl.uniform1f(p.u("uDamp"), env.rippleDamp);
       gl.uniform1f(p.u("uAspect"), aspect);
       setBed(p);
       bindTex(1, floatTex);
@@ -552,6 +552,7 @@ export function createRenderer(
     gl.useProgram(p.p);
     setBed(p);
     gl.uniform1f(p.u("uCausticK"), env.caustic);
+    gl.uniform1f(p.u("uCausticFloor"), env.causticFloor);
     gl.uniform1f(p.u("uShadowK"), env.shadow);
     gl.uniform3fv(p.u("uCausticTint"), env.causticTint);
     gl.uniform1f(p.u("uDepthK"), env.depth);
@@ -618,6 +619,7 @@ export function createRenderer(
     gl.uniform1f(p.u("uSkyK"), env.skyK);
     gl.uniform1f(p.u("uVignette"), env.vignette);
     gl.uniform1f(p.u("uMoon"), env.moon);
+    gl.uniform1f(p.u("uMoonFloor"), env.moonFloor);
     gl.uniform1f(p.u("uBright"), env.bright);
     gl.uniform1f(p.u("uSat"), env.sat);
     gl.uniform1f(p.u("uShade"), env.shade);
