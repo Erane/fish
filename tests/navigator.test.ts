@@ -12,6 +12,8 @@ const SLOT = [700, 340, 1000, 340, 1000, 460, 700, 460];
 const slot = new Field(SLOT, W, H, []);
 const LSHAPE = [120, 90, 1480, 90, 1480, 810, 560, 810, 560, 450, 120, 450];
 const arm = new Field(LSHAPE, 1600, 900, []);
+const POCKET = [590, 385, 650, 385, 650, 435, 590, 435];
+const pocket = new Field(POCKET, 1200, 800, []);
 const L = 80;
 const IN = L * SHORE;
 const RIGHT = 1000 - IN;
@@ -132,6 +134,24 @@ describe("scanHeading 扇形探路", () => {
     const up = scanHeading(pond, RIGHT, 400, 0, L, -1);
     const down = scanHeading(pond, RIGHT, 400, 0, L, 1);
     expect(Math.sign(up.y)).not.toBe(Math.sign(down.y));
+  });
+
+  it("四面受阻时指向净空最大的方向，而不是继续顶墙", () => {
+    const probe = (h: { x: number; y: number }): number => {
+      let q = Infinity;
+      for (const r of [0.5, 1.1]) {
+        const v = pocket.clearance(620 + h.x * L * r, 410 + h.y * L * r);
+        if (v < q) q = v;
+      }
+      return q;
+    };
+    let bestQ = -Infinity;
+    for (let i = -12; i <= 12; i++) {
+      const a = i * (Math.PI / 12);
+      bestQ = Math.max(bestQ, probe({ x: Math.cos(a), y: Math.sin(a) }));
+    }
+    const h = scanHeading(pocket, 620, 410, 0, L, 1);
+    expect(probe(h)).toBeCloseTo(bestQ, 6);
   });
 
   it("探路结果为单位向量且数值有限", () => {

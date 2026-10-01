@@ -43,7 +43,7 @@
 ## 外壳生命周期与真相源
 
 - 单实例（tauri-plugin-single-instance），重复双击不开新进程。
-- 托盘菜单：打开池塘、交互模式（喂鱼/惊扰/观鱼三选一子菜单）、开机自启开关、退出。交互默认喂鱼，自启默认开。
+- 托盘菜单：打开池塘、重新投放鱼群（广播 `respawn-fish`，前端执行 `PondSimulation.respawn`，见 `src/core/simulation.ts`）、交互模式（喂鱼/惊扰/观鱼三选一子菜单）、开机自启开关、退出。交互默认喂鱼，自启默认开。
 - 真相源（不新增第二套存储）：
   - 池塘数据 → 前端 IndexedDB（`src/data/db.ts`），零改动。
   - 交互模式 → 前端 `Settings.interaction`（类型 `Interaction` 定义于 `src/core/types.ts`）唯一真相。托盘三选一或池塘窗口按钮发起：Rust 执行钩子启停并回显托盘、广播 `interaction-changed`；前端应用并持久化，壁纸窗口存活期由池塘窗口担当唯一写入者（沿用 `pond-state` 挂起规则）；前端经 `set_wallpaper_mode` 命令回发，事件监听只应用不回传，防回环。

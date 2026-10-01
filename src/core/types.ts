@@ -58,6 +58,9 @@ export interface Fish extends StoredFish {
   goal: Goal | null;
   goalTime: number;
   rest: number;
+  checkT: number;
+  checkX: number;
+  checkY: number;
   flee: number;
   fleeAngle: number;
   cruise: number;

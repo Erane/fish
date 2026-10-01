@@ -386,6 +386,15 @@ export function renderSettings(content: HTMLElement, ctx: PanelCtx): void {
       elem("button", {
         type: "button",
         class: "secondary",
+        text: "重新投放鱼群",
+        onclick: () => {
+          ctx.sim.respawn();
+          ctx.toast("鱼群已重新投放");
+        },
+      }),
+      elem("button", {
+        type: "button",
+        class: "secondary",
         text: "全屏观鱼",
         onclick: () => ctx.enterZen(),
       }),

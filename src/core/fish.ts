@@ -62,6 +62,9 @@ function makeFish(seed: FishSeed, random: () => number): Fish {
     goal: null,
     goalTime: 0,
     rest: 0,
+    checkT: 2 + random() * 2,
+    checkX: 0,
+    checkY: 0,
     flee: 0,
     fleeAngle: 0,
     cruise: 0.4,
@@ -72,6 +75,8 @@ function makeFish(seed: FishSeed, random: () => number): Fish {
   };
   f.depth = f.species === "silvercarp" ? 0.23 + random() * 0.2 : 0.25 + random() * 0.55;
   f.depthGoal = f.depth;
+  f.checkX = f.x;
+  f.checkY = f.y;
   f.cruise = (0.3 + random() * 0.22) * clamp(f.speed || 1, 0.5, 1.5);
   f.react = 0.15 + random() * 0.9;
   f.appetite = 0.55 + random() * 0.45;

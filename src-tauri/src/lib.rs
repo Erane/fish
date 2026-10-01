@@ -238,6 +238,7 @@ impl TrayMenu {
 
 fn build_tray(app: &AppHandle) {
     let open = MenuItem::with_id(app, "open", "打开池塘", true, None::<&str>);
+    let respawn = MenuItem::with_id(app, "respawn", "重新投放鱼群", true, None::<&str>);
     let mode = Submenu::with_id(app, "mode", "交互模式", true);
     let feed = CheckMenuItem::with_id(app, "mode-feed", "喂鱼", true, true, None::<&str>);
     let startle = CheckMenuItem::with_id(app, "mode-startle", "惊扰", true, false, None::<&str>);
@@ -251,13 +252,13 @@ fn build_tray(app: &AppHandle) {
         None::<&str>,
     );
     let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>);
-    let (Ok(open), Ok(mode), Ok(feed), Ok(startle), Ok(watch), Ok(auto), Ok(quit)) =
-        (open, mode, feed, startle, watch, auto, quit)
+    let (Ok(open), Ok(respawn), Ok(mode), Ok(feed), Ok(startle), Ok(watch), Ok(auto), Ok(quit)) =
+        (open, respawn, mode, feed, startle, watch, auto, quit)
     else {
         return;
     };
     let _ = mode.append_items(&[&feed, &startle, &watch]);
-    let Ok(menu) = Menu::with_items(app, &[&open, &mode, &auto, &quit]) else {
+    let Ok(menu) = Menu::with_items(app, &[&open, &respawn, &mode, &auto, &quit]) else {
         return;
     };
     app.manage(TrayMenu {
@@ -273,6 +274,9 @@ fn build_tray(app: &AppHandle) {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "open" => open_pond(app),
+            "respawn" => {
+                let _ = app.emit("respawn-fish", true);
+            }
             "mode-feed" => change_mode(app, Interaction::Feed),
             "mode-startle" => change_mode(app, Interaction::Startle),
             "mode-watch" => change_mode(app, Interaction::Watch),

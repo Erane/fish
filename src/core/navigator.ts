@@ -90,14 +90,21 @@ export function scanHeading(
   if (block === 0) return { x: Math.cos(angle), y: Math.sin(angle), block: 0 };
   let vx = 0;
   let vy = 0;
+  let bestQ = -Infinity;
+  let bestA = angle;
   for (let i = -SIDES; i <= SIDES; i++) {
     const off = i * STEP;
     const a = angle + off;
-    const w = Math.exp(GAIN * dir(a)[1] - DRIFT * Math.abs(off) + HAND * Math.sign(off) * hand);
+    const [q, g] = dir(a);
+    if (q > bestQ) {
+      bestQ = q;
+      bestA = a;
+    }
+    const w = Math.exp(GAIN * g - DRIFT * Math.abs(off) + HAND * Math.sign(off) * hand);
     vx += Math.cos(a) * w;
     vy += Math.sin(a) * w;
   }
   const l = Math.hypot(vx, vy);
-  if (!(l > 1e-6)) return { x: Math.cos(angle), y: Math.sin(angle), block };
+  if (bestQ < room || !(l > 1e-6)) return { x: Math.cos(bestA), y: Math.sin(bestA), block };
   return { x: vx / l, y: vy / l, block };
 }

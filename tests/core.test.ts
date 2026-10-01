@@ -116,6 +116,92 @@ describe("惊鱼", () => {
     for (let i = 0; i < 45; i++) pond.step(1 / 60);
     expect(Math.hypot(fish.x * 1000 - 520, fish.y * 700 - 350)).toBeGreaterThan(60);
   });
+
+  it("角落里的鱼被惊扰时逃离方向偏向开阔处，而不是顶进墙角", () => {
+    const random = randomSeed(11);
+    const fish = createFish(0, random);
+    fish.x = 970 / 1200;
+    fish.y = 620 / 800;
+    fish.angle = Math.PI / 4;
+    const pond = new PondSimulation([fish], 1200, 800, random);
+    pond.boundary = [200, 150, 1000, 150, 1000, 650, 200, 650];
+    const reach = BODY.length * fish.size * pond.scale;
+    const probeQ = (a: number): number => {
+      let q = Infinity;
+      for (const r of [0.5, 1.1]) {
+        const v = pond.field.clearance(
+          970 + Math.cos(a) * reach * r,
+          620 + Math.sin(a) * reach * r,
+        );
+        if (v < q) q = v;
+      }
+      return q;
+    };
+    const raw = Math.atan2(620 - 400, 970 - 600);
+    pond.scare(600, 400, 500);
+    expect(fish.flee).toBeGreaterThan(0);
+    expect(probeQ(fish.fleeAngle)).toBeGreaterThan(probeQ(raw));
+  });
+});
+
+describe("受困自救", () => {
+  it("位移停滞的鱼触发自救，窜向最开阔的水域", () => {
+    const random = randomSeed(3);
+    const fish = createFish(0, random);
+    fish.x = 0.5;
+    fish.y = 0.5;
+    fish.checkX = 0.5;
+    fish.checkY = 0.5;
+    const pond = new PondSimulation([fish], 1200, 800, random);
+    fish.checkT = 0;
+    pond.step(1 / 60);
+    expect(fish.flee).toBeGreaterThan(0);
+    expect(fish.goal).not.toBeNull();
+  });
+
+  it("顶在墙角的鱼几秒内自行离开", () => {
+    const random = randomSeed(7);
+    const fish = createFish(0, random);
+    fish.x = 970 / 1200;
+    fish.y = 620 / 800;
+    fish.angle = Math.PI / 4;
+    const pond = new PondSimulation([fish], 1200, 800, random);
+    pond.boundary = [200, 150, 1000, 150, 1000, 650, 200, 650];
+    for (let i = 0; i < 60 * 8; i++) pond.step(1 / 60);
+    const moved = Math.hypot(fish.x * 1200 - 970, fish.y * 800 - 620);
+    expect(moved).toBeGreaterThan(2 * BODY.length * fish.size * pond.scale);
+  });
+});
+
+describe("重新投放", () => {
+  it("respawn 后全员落位开阔、彼此分开且状态归零", () => {
+    const random = randomSeed(8);
+    const fish = Array.from({ length: 12 }, (_, i) => createFish(i, random));
+    const shoal = createSilverCarpShoal(random);
+    const pond = new PondSimulation(fish, 1200, 800, random, shoal, true);
+    for (const f of pond.allFish) {
+      f.x = 0.5;
+      f.y = 0.5;
+      f.v = 40;
+      f.goal = { x: 0.5, y: 0.5 };
+      f.flee = 3;
+      f.rest = 2;
+    }
+    pond.respawn();
+    const L = (f: Fish): number => BODY.length * f.size * pond.scale;
+    for (const f of pond.allFish) {
+      expect(pond.field.clearance(f.x * 1200, f.y * 800)).toBeGreaterThan(0);
+      expect(f.v).toBe(0);
+      expect(f.flee).toBe(0);
+      expect(f.goal).toBeNull();
+    }
+    const all = pond.allFish;
+    for (let i = 0; i < all.length; i++)
+      for (let j = i + 1; j < all.length; j++)
+        expect(
+          Math.hypot((all[i]!.x - all[j]!.x) * 1200, (all[i]!.y - all[j]!.y) * 800),
+        ).toBeGreaterThan((L(all[i]!) + L(all[j]!)) * 0.7 - 1);
+  });
 });
 
 describe("weatherFromCode", () => {

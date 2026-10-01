@@ -38,12 +38,14 @@ export function applyWallpaperInput(payload: unknown, root: Document = document)
 export function watchShellState(handlers: {
   onPondState: (alive: boolean) => void;
   onInteractionChanged: (mode: Interaction) => void;
+  onRespawn: () => void;
 }): void {
   void tauri().event.listen("pond-state", ({ payload }) => handlers.onPondState(payload === true));
   void tauri().event.listen("interaction-changed", ({ payload }) => {
     const mode = INTERACTIONS.find((m) => m === payload);
     if (mode) handlers.onInteractionChanged(mode);
   });
+  void tauri().event.listen("respawn-fish", () => handlers.onRespawn());
 }
 
 export function bindWallpaperInput(): void {

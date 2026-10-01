@@ -71,49 +71,134 @@ export class PondSimulation {
   }
 
   scare(x: number, y: number, radius = 170): void {
+    const field = this.field;
     for (const f of this.allFish) {
       const dx = f.x * this.width - x;
       const dy = f.y * this.height - y;
       const d = Math.hypot(dx, dy);
       if (d < radius) {
+        const L = BODY.length * f.size * this.scale;
+        const away = Math.atan2(dy, dx) + (this.random() - 0.5) * 0.9;
+        const head = scanHeading(
+          field,
+          f.x * this.width,
+          f.y * this.height,
+          away,
+          L,
+          handed(f.seed),
+        );
         f.flee = 0.45 + (1 - d / radius) * 0.7;
-        f.fleeAngle = Math.atan2(dy, dx) + (this.random() - 0.5) * 0.9;
+        f.fleeAngle = head.block > 0 ? Math.atan2(head.y, head.x) : away;
         f.beating = true;
-        f.v = Math.max(f.v, BODY.length * f.size * this.scale * 0.8);
+        f.v = Math.max(f.v, L * 0.8);
         f.depthGoal = Math.min(0.95, f.depth + 0.35);
       }
     }
+  }
+
+  respawn(): void {
+    const field = this.field;
+    const w = this.width;
+    const h = this.height;
+    const placed: Fish[] = [];
+    for (const f of this.allFish) {
+      const L = BODY.length * f.size * this.scale;
+      let spot: Goal | null = null;
+      let fallback: Goal | null = null;
+      let fallbackClear = -Infinity;
+      for (const s of this.spots(field, 12)) {
+        if (s.clear > fallbackClear) {
+          fallbackClear = s.clear;
+          fallback = s.goal;
+        }
+        const apart = placed.every(
+          (o) =>
+            Math.hypot((o.x - s.goal.x) * w, (o.y - s.goal.y) * h) >=
+            (L + BODY.length * o.size * this.scale) * 0.7,
+        );
+        if (s.clear >= L * 0.8 && apart) {
+          spot = s.goal;
+          break;
+        }
+      }
+      const goal = spot ?? fallback!;
+      const [px, py] = field.inside(goal.x * w, goal.y * h, L);
+      f.x = px / w;
+      f.y = py / h;
+      f.angle = this.random() * TAU;
+      f.phase = this.random() * 10;
+      f.v = 0;
+      f.turn = 0;
+      f.thrust = 0;
+      f.beating = false;
+      f.goal = null;
+      f.goalTime = 0;
+      f.flee = 0;
+      f.rest = 0;
+      f.checkT = 2 + this.random() * 2;
+      f.checkX = f.x;
+      f.checkY = f.y;
+      placed.push(f);
+    }
+  }
+
+  private spots(field: Field, count: number): { goal: Goal; clear: number }[] {
+    const r = this.random;
+    const m = 0.15;
+    const w = this.width;
+    const h = this.height;
+    const list: { goal: Goal; clear: number }[] = [];
+    for (let i = 0; i < count; i++) {
+      const goal = { x: m + r() * (1 - 2 * m), y: m + r() * (1 - 2 * m) };
+      list.push({ goal, clear: field.clearance(goal.x * w, goal.y * h) });
+    }
+    return list;
+  }
+
+  private openSpot(field: Field): Goal {
+    let best: Goal = { x: 0.5, y: 0.5 };
+    let clear = -Infinity;
+    for (const s of this.spots(field, GOAL_SAMPLES))
+      if (s.clear > clear) {
+        clear = s.clear;
+        best = s.goal;
+      }
+    return best;
+  }
+
+  private escape(f: Fish, field: Field): void {
+    const spot = this.openSpot(field);
+    f.goal = spot;
+    f.goalTime = 6 + this.random() * 4;
+    f.flee = 1.1;
+    f.fleeAngle = Math.atan2((spot.y - f.y) * this.height, (spot.x - f.x) * this.width);
   }
 
   pickGoal(f: Fish, field: Field): void {
     const r = this.random;
     const w = this.width;
     const h = this.height;
-    const m = 0.15;
     const span = Math.min(w, h);
     const need = BODY.length * f.size * this.scale * 0.8;
     let best: Goal | null = null;
     let score = -Infinity;
     let room: Goal = { x: f.x, y: f.y };
     let roomClear = field.clearance(f.x * w, f.y * h);
-    for (let i = 0; i < GOAL_SAMPLES; i++) {
-      const gx = m + r() * (1 - 2 * m);
-      const gy = m + r() * (1 - 2 * m);
-      const clear = field.clearance(gx * w, gy * h);
-      if (clear > roomClear) {
-        roomClear = clear;
-        room = { x: gx, y: gy };
+    for (const s of this.spots(field, GOAL_SAMPLES)) {
+      if (s.clear > roomClear) {
+        roomClear = s.clear;
+        room = s.goal;
       }
-      if (clear < need) continue;
-      const dx = (gx - f.x) * w;
-      const dy = (gy - f.y) * h;
+      if (s.clear < need) continue;
+      const dx = (s.goal.x - f.x) * w;
+      const dy = (s.goal.y - f.y) * h;
       const sc =
         -Math.abs(wrap(Math.atan2(dy, dx) - f.angle)) * 1.2 +
         (Math.min(Math.hypot(dx, dy), span * 0.6) / span) * 2 +
         r() * 0.6;
       if (sc > score) {
         score = sc;
-        best = { x: gx, y: gy };
+        best = s.goal;
       }
     }
     f.goal = best ?? room;
@@ -170,6 +255,14 @@ export class PondSimulation {
         fd = d;
         food = p;
       }
+    }
+    f.checkT -= dt;
+    if (f.checkT <= 0) {
+      f.checkT = 2 + random() * 2;
+      const moved = Math.hypot((f.x - f.checkX) * w, (f.y - f.checkY) * h);
+      f.checkX = f.x;
+      f.checkY = f.y;
+      if (moved < L * 0.4 && f.flee <= 0 && f.rest <= 0) this.escape(f, field);
     }
     let gx: number;
     let gy: number;

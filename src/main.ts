@@ -238,6 +238,7 @@ async function boot(): Promise<void> {
   }
   if (inTauri()) {
     const sink = persister;
+    const pond = sim;
     watchShellState({
       onPondState: (alive) => {
         if (!wallpaper) return;
@@ -247,6 +248,10 @@ async function boot(): Promise<void> {
       onInteractionChanged: (mode) => {
         store.set("interaction", mode);
         applyMode(mode);
+      },
+      onRespawn: () => {
+        pond.respawn();
+        if (!wallpaper) shell?.toast("鱼群已重新投放");
       },
     });
     if (wallpaper) {
