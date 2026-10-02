@@ -635,7 +635,7 @@ describe("微行为", () => {
       if (f.wary > 0) {
         sawWary = true;
         if (f.depthGoal < 0.7) deepGoal = false;
-        if (f.v < cruiseV()) fast = false;
+        if (f.v < cruiseV() * 0.85) fast = false;
       } else if (sawWary && !settled && f.v < cruiseV() * 1.15) settled = true;
     }
     expect(sawWary).toBe(true);

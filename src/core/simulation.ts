@@ -163,10 +163,10 @@ export class PondSimulation {
     return list;
   }
 
-  private openSpot(field: Field): Goal {
+  private openSpot(field: Field, samples = GOAL_SAMPLES): Goal {
     let best: Goal = { x: 0.5, y: 0.5 };
     let clear = -Infinity;
-    for (const s of this.spots(field, GOAL_SAMPLES))
+    for (const s of this.spots(field, samples))
       if (s.clear > clear) {
         clear = s.clear;
         best = s.goal;
@@ -175,7 +175,7 @@ export class PondSimulation {
   }
 
   private escape(f: Fish, field: Field): void {
-    const spot = this.openSpot(field);
+    const spot = this.openSpot(field, 24);
     f.goal = spot;
     f.goalTime = 6 + this.random() * 4;
     f.flee = 1.1;
@@ -285,7 +285,7 @@ export class PondSimulation {
       const moved = Math.hypot((f.x - f.checkX) * w, (f.y - f.checkY) * h);
       f.checkX = f.x;
       f.checkY = f.y;
-      if (moved < L * 0.4 && f.flee <= 0 && f.rest <= 0 && !f.target && f.peck <= 0)
+      if (moved < L * 0.6 && f.flee <= 0 && f.rest <= 0 && !f.target && f.peck <= 0)
         this.escape(f, field);
     }
     let gx: number;
@@ -379,7 +379,13 @@ export class PondSimulation {
           f.peckCd = 20 + random() * 15;
           f.depthGoal = 0.97;
         }
-        if (f.chase === null && f.chaseCd <= 0 && f.rest <= 0 && random() < dt * 0.008) {
+        if (
+          f.chase === null &&
+          f.chaseCd <= 0 &&
+          f.rest <= 0 &&
+          field.clearance(x, y) > L * 2 &&
+          random() < dt * 0.006
+        ) {
           const reach = Math.max(w, h) * 0.45;
           let best: Fish | null = null;
           let bd = Infinity;
@@ -395,7 +401,11 @@ export class PondSimulation {
             )
               continue;
             const d = Math.hypot((o.x - f.x) * w, (o.y - f.y) * h);
-            if (d < bd && d < reach) {
+            if (
+              d < bd &&
+              d < reach &&
+              field.clearance(o.x * w, o.y * h) > BODY.length * o.size * this.scale * 2
+            ) {
               bd = d;
               best = o;
             }
@@ -403,8 +413,17 @@ export class PondSimulation {
           if (best) {
             f.chase = best;
             f.chaseT = 1.5 + random() * 1.5;
+            const away = Math.atan2((best.y - f.y) * h, (best.x - f.x) * w);
+            const esc = scanHeading(
+              field,
+              best.x * w,
+              best.y * h,
+              away,
+              BODY.length * best.size * this.scale,
+              handed(best.seed),
+            );
             best.flee = 0.5;
-            best.fleeAngle = Math.atan2((best.y - f.y) * h, (best.x - f.x) * w);
+            best.fleeAngle = esc.block > 0 ? Math.atan2(esc.y, esc.x) : away;
           }
         }
         if (f.wary <= 0 && random() < dt * 0.03)
@@ -413,7 +432,6 @@ export class PondSimulation {
             : clamp(f.temper.depthBand + (random() - 0.5) * 0.4, 0.05, 0.95);
       }
     }
-    if (f.wary > 0) want *= 1.25;
     let sx = 0;
     let sy = 0;
     let ax = 0;
@@ -462,7 +480,7 @@ export class PondSimulation {
         ax += Math.cos(o.angle);
         ay += Math.sin(o.angle);
       }
-      if (silver && o.species === f.species && d < L * 5) {
+      if (silver && o.species === f.species && d < L * 5 && field.clearance(o.x * w, o.y * h) > L) {
         cx += ox;
         cy += oy;
         companions++;
@@ -482,6 +500,15 @@ export class PondSimulation {
     }
     const head = scanHeading(field, x, y, f.angle, L, handed(f.seed));
     const block = head.block;
+    if (f.wary > 0) want *= block < 0.4 ? 1.25 : 0.45;
+    if (f.flee > 0) {
+      if (block > 0.5) f.flee = Math.min(f.flee, 0.08);
+      want *= block < 0.4 ? 1 : 0.5;
+    }
+    if (f.chase !== null && block > 0.5) {
+      f.chase = null;
+      f.chaseCd = 30 + random() * 20;
+    }
     const sm = Math.hypot(sx, sy);
     const sw = sm / (sm + sepK);
     const nx = sm > 0 ? sx / sm : 0;
