@@ -58,6 +58,24 @@ export interface SimView {
   obstacles: Obstacle[];
 }
 
+export function finSpread(
+  f: Fish,
+  time: number,
+  side: number,
+  spreadK: number,
+  bl: number,
+): number {
+  const base =
+    1.05 -
+    0.6 * clamp(bl / 1.4, 0, 1) +
+    (f.thrust < 0.3 ? Math.sin(time * 4.2 + f.seed) * 0.16 : 0);
+  const idle =
+    f.rest > 0 || f.thrust < 0.15
+      ? side * Math.sin(time * (2.2 + f.temper.scullRate) + f.seed * 0.013) * 0.25
+      : 0;
+  return (base + clamp(side * f.turn * 0.35, -0.3, 0.5) + idle) * spreadK;
+}
+
 export class PondScene {
   private readonly R: Renderer;
   private readonly sim: SimView;
@@ -455,10 +473,6 @@ export class PondScene {
           ? ([...hexToRgb01(pal.fin), 0.85] as Vec4)
           : this.finTint[f.palette]!;
     const tint: Vec4 = [src[0] * abs[0], src[1] * abs[1], src[2] * abs[2], src[3]];
-    const base =
-      1.05 -
-      0.6 * clamp(bl / 1.4, 0, 1) +
-      (f.thrust < 0.3 ? Math.sin(this.time * 4.2 + f.seed) * 0.16 : 0);
     const fins: [number, number, number][] = [
       [4, 0.95, 1],
       [8, 0.55, 0.58],
@@ -474,7 +488,7 @@ export class PondScene {
         s *
         0.8;
       for (const side of [1, -1]) {
-        const spread = (base + clamp(side * f.turn * 0.35, -0.3, 0.5)) * spreadK;
+        const spread = finSpread(f, this.time, side, spreadK, bl);
         const ang = heading + side * (Math.PI - spread);
         const X = cx + (px + nx * hw * side - cx) * k;
         const Y = cy + (py + ny * hw * side - cy) * k;

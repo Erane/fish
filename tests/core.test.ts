@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vite-plus/test";
+import { finSpread } from "../src/scene/scene.ts";
 import {
   PondSimulation,
   createFish,
@@ -482,6 +483,35 @@ describe("头部微摆", () => {
       if (tail > maxTail) maxTail = tail;
     }
     expect(maxHead / maxTail).toBeGreaterThan(0.12);
+  });
+});
+
+describe("鳍划水", () => {
+  it("怠速时胸鳍两侧反相慢速划水", () => {
+    const random = randomSeed(53);
+    const f = createFish(0, random);
+    f.rest = 1e9;
+    f.thrust = 0;
+    f.turn = 0;
+    f.v = 0;
+    const n = 240;
+    const vals: [number, number][] = [];
+    let minL = Infinity;
+    let maxL = -Infinity;
+    for (let i = 0; i < n; i++) {
+      const t = i / 60;
+      const l = finSpread(f, t, 1, 0.95, 0);
+      const r = finSpread(f, t, -1, 0.95, 0);
+      vals.push([l, r]);
+      if (l < minL) minL = l;
+      if (l > maxL) maxL = l;
+    }
+    const ml = vals.reduce((s, v) => s + v[0], 0) / n;
+    const mr = vals.reduce((s, v) => s + v[1], 0) / n;
+    let cov = 0;
+    for (const [l, r] of vals) cov += (l - ml) * (r - mr);
+    expect((maxL - minL) / 0.95).toBeGreaterThan(0.5);
+    expect(cov).toBeLessThan(-1);
   });
 });
 
