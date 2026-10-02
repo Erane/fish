@@ -1,4 +1,4 @@
-import { BODY, updateSpine } from "./fish.ts";
+import { BODY, spineGap, updateSpine } from "./fish.ts";
 import { clamp, TAU, wrap } from "./math.ts";
 import { Field, handed, scanHeading } from "./navigator.ts";
 import type { EatEvent, Fish, Food, Goal, Obstacle } from "./types.ts";
@@ -335,12 +335,30 @@ export class PondSimulation {
       const oy = o.y * h - y;
       const d = Math.hypot(ox, oy);
       if (d < 1e-6) continue;
-      const R = (L + BODY.length * o.size * this.scale) * 0.52;
+      const Lo = BODY.length * o.size * this.scale;
+      const R = (L + Lo) * 0.52;
       const near = Math.max(0.15, 1 - Math.min(1, Math.abs(o.depth - f.depth) * 1.6));
-      if (d < R) {
-        const k = (1 - d / R) ** 2 * near;
-        sx -= (ox / d) * k;
-        sy -= (oy / d) * k;
+      let k = 0;
+      let kx = 0;
+      let ky = 0;
+      if (d < (L + Lo) * 0.75) {
+        const hit = spineGap(f, o, s, o.size * this.scale);
+        if (hit) {
+          const reach = (L + Lo) * 0.22;
+          if (hit.gap < reach) {
+            k = Math.min(1.5, (1 - hit.gap / reach) ** 2) * near;
+            kx = hit.px;
+            ky = hit.py;
+          }
+        } else if (d < R) {
+          k = (1 - d / R) ** 2 * near;
+          kx = -ox / d;
+          ky = -oy / d;
+        }
+      }
+      if (k > 0) {
+        sx += kx * k;
+        sy += ky * k;
       }
       if ((ox * cos + oy * sin) / d > 0.8 && d < L * 1.6 && near > 0.3) {
         const side = oy * cos - ox * sin > 0 ? -1 : 1;

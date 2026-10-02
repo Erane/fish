@@ -7,6 +7,7 @@ import {
   weatherFromCode,
   sanitizeSave,
   fishPose,
+  spineGap,
   BODY,
   PALETTES,
   type Fish,
@@ -229,6 +230,74 @@ describe("深度分离", () => {
       minD = Math.min(minD, Math.hypot((a.x - b.x) * W, (a.y - b.y) * H));
     }
     expect(minD).toBeLessThan(L * 2 * 0.35);
+    for (const f of [a, b]) {
+      expect(Number.isFinite(f.x)).toBe(true);
+      expect(Number.isFinite(f.angle)).toBe(true);
+    }
+  });
+});
+
+describe("脊柱表面距", () => {
+  function gapOf(pond: PondSimulation, a: Fish, b: Fish): number {
+    return spineGap(a, b, a.size * pond.scale, b.size * pond.scale)!.gap;
+  }
+
+  it("短鱼鼻尖贴着长鱼尾段并行时，表面距被推正", () => {
+    const random = randomSeed(21);
+    const a = createFish(0, random);
+    const b = createFish(1, random);
+    const pond = new PondSimulation([a, b], 1000, 700, random);
+    const pin = (f: Fish, size: number, x: number, y: number, cruise: number): void => {
+      f.size = size;
+      f.x = x;
+      f.y = y;
+      f.angle = 0;
+      f.cruise = cruise;
+      f.rest = 1e9;
+      f.v = 0;
+      f.goal = { x: f.x + 0.5, y: f.y };
+      f.goalTime = 1e9;
+      f.checkT = 1e9;
+      f.depth = 0.5;
+      f.depthGoal = 0.5;
+    };
+    pin(a, 1.2, 0.4, 0.5, 0.4);
+    pin(b, 0.3, 0.4 - 76 / 1000, 0.5 + 5 / 700, 1.6);
+    pond.step(1 / 60);
+    const gap0 = gapOf(pond, a, b);
+    expect(gap0).toBeLessThan(0);
+    for (let i = 0; i < 120; i++) pond.step(1 / 60);
+    expect(gapOf(pond, a, b)).toBeGreaterThan(2);
+  });
+
+  it("短鱼垂直穿越长鱼尾段不穿插", () => {
+    const random = randomSeed(23);
+    const a = createFish(0, random);
+    const b = createFish(1, random);
+    const pond = new PondSimulation([a, b], 1000, 700, random);
+    const flee = (f: Fish, size: number, x: number, y: number, angle: number, v: number): void => {
+      f.size = size;
+      f.x = x;
+      f.y = y;
+      f.angle = angle;
+      f.fleeAngle = angle;
+      f.flee = 9;
+      f.v = v;
+      f.checkT = 1e9;
+      f.depth = 0.5;
+      f.depthGoal = 0.5;
+    };
+    flee(a, 1.2, 0.2, 0.5, 0, 150);
+    flee(b, 0.3, 0.45, 0.377, Math.PI / 2, 80);
+    let minGap = Infinity;
+    let minD = Infinity;
+    for (let i = 0; i < 240; i++) {
+      pond.step(1 / 60);
+      minGap = Math.min(minGap, gapOf(pond, a, b));
+      minD = Math.min(minD, Math.hypot((a.x - b.x) * 1000, (a.y - b.y) * 700));
+    }
+    expect(minD).toBeLessThan((BODY.length * 1.2 + BODY.length * 0.3) * 0.9);
+    expect(minGap).toBeGreaterThan(-1);
     for (const f of [a, b]) {
       expect(Number.isFinite(f.x)).toBe(true);
       expect(Number.isFinite(f.angle)).toBe(true);
