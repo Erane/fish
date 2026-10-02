@@ -269,7 +269,7 @@ export class PondSimulation {
     let want: number;
     let turnGain = silver ? 3.5 : 2;
     let maxTurn = silver ? 2.4 : 1.3;
-    let sepW = 2.4;
+    let sepK = 0.6;
     f.flee = Math.max(0, f.flee - dt);
     if (f.flee > 0) {
       gx = Math.cos(f.fleeAngle);
@@ -296,7 +296,7 @@ export class PondSimulation {
       }
       turnGain = 4.5;
       maxTurn = 3.4;
-      sepW = 1.1;
+      sepK = 1;
       f.depthGoal = 0.04;
       if (fd < Math.max(6, 7 * s)) {
         fx.eaten = true;
@@ -390,8 +390,12 @@ export class PondSimulation {
     }
     const head = scanHeading(field, x, y, f.angle, L, handed(f.seed));
     const block = head.block;
-    const tx = gx + sx * sepW + ax * 0.15;
-    const ty = gy + sy * sepW + ay * 0.15;
+    const sm = Math.hypot(sx, sy);
+    const sw = sm / (sm + sepK);
+    const nx = sm > 0 ? sx / sm : 0;
+    const ny = sm > 0 ? sy / sm : 0;
+    const tx = gx * (1 - sw) + nx * sw + ax * 0.15;
+    const ty = gy * (1 - sw) + ny * sw + ay * 0.15;
     const tl = Math.hypot(tx, ty) || 1;
     const desired = Math.atan2(
       (ty / tl) * (1 - block) + head.y * block,

@@ -305,6 +305,54 @@ describe("脊柱表面距", () => {
   });
 });
 
+describe("密集稳定性", () => {
+  it("中心密集的鱼群散得开、航向不抖动、后期同深度不穿插", () => {
+    const random = randomSeed(31);
+    const fish = Array.from({ length: 12 }, (_, i) => createFish(i, random));
+    const pond = new PondSimulation(fish, 1200, 800, random);
+    for (const f of fish) {
+      f.x = 0.4 + random() * 0.2;
+      f.y = 0.4 + random() * 0.2;
+    }
+    const spread = (): number => {
+      let sum = 0;
+      for (let i = 0; i < fish.length; i++)
+        for (let j = i + 1; j < fish.length; j++)
+          sum += Math.hypot((fish[i]!.x - fish[j]!.x) * 1200, (fish[i]!.y - fish[j]!.y) * 800);
+      return sum / ((fish.length * (fish.length - 1)) / 2);
+    };
+    const d0 = spread();
+    let turnSum = 0;
+    let deep = 0;
+    let samples = 0;
+    for (let i = 0; i < 3000; i++) {
+      pond.step(1 / 60);
+      if (i < 300) for (const f of fish) turnSum += Math.abs(f.turn);
+      if (i > 600 && i % 5 === 0)
+        for (let a = 0; a < fish.length; a++)
+          for (let b = a + 1; b < fish.length; b++) {
+            if (Math.abs(fish[a]!.depth - fish[b]!.depth) > 0.25) continue;
+            const g = spineGap(
+              fish[a]!,
+              fish[b]!,
+              fish[a]!.size * pond.scale,
+              fish[b]!.size * pond.scale,
+            );
+            if (!g) continue;
+            samples++;
+            if (g.gap < -3) deep++;
+          }
+    }
+    expect(spread()).toBeGreaterThan(d0 * 1.8);
+    expect(turnSum / (300 * fish.length)).toBeLessThan(0.56);
+    expect(deep / samples).toBeLessThan(0.01);
+    for (const f of fish) {
+      expect(Number.isFinite(f.x)).toBe(true);
+      expect(Number.isFinite(f.angle)).toBe(true);
+    }
+  });
+});
+
 describe("重新投放", () => {
   it("respawn 后全员落位开阔、彼此分开且状态归零", () => {
     const random = randomSeed(8);
