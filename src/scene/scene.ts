@@ -84,6 +84,7 @@ export class PondScene {
   private readonly pose: Float32Array;
   private readonly calm: boolean;
   private readonly wakes = new Map<Fish, number>();
+  private readonly bottoms = new Map<Fish, number>();
   private rain: RainDrop[] = [];
   private snow: Flake[] = [];
   private splashes: Splash[] = [];
@@ -192,6 +193,7 @@ export class PondScene {
 
   forget(f: Fish): void {
     this.wakes.delete(f);
+    this.bottoms.delete(f);
     this.R.drop(f.x * this.w, f.y * this.h, 12 * this.scale, 0.8);
   }
 
@@ -436,6 +438,13 @@ export class PondScene {
           }
           this.wakes.set(f, 0.14);
         } else this.wakes.set(f, t);
+      }
+      if (f.peck > 0 && f.depth > 0.85 && !this.calm) {
+        const bt = (this.bottoms.get(f) ?? 0) - dt;
+        if (bt <= 0) {
+          this.R.drop(f.x * w, f.y * h, 4.5 * scale, 0.12);
+          this.bottoms.set(f, 0.5);
+        } else this.bottoms.set(f, bt);
       }
     }
 

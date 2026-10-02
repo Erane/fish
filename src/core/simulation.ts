@@ -1,4 +1,4 @@
-import { BODY, spineGap, updateSpine } from "./fish.ts";
+import { BODY, chaseStagger, peckStagger, spineGap, updateSpine } from "./fish.ts";
 import { clamp, TAU, wrap } from "./math.ts";
 import { Field, handed, scanHeading } from "./navigator.ts";
 import type { EatEvent, Fish, Food, Goal, Obstacle } from "./types.ts";
@@ -136,6 +136,12 @@ export class PondSimulation {
       f.goalTime = 0;
       f.target = null;
       f.flee = 0;
+      f.wary = 0;
+      f.peck = 0;
+      f.peckCd = peckStagger(f.seed);
+      f.chase = null;
+      f.chaseT = 0;
+      f.chaseCd = chaseStagger(f.seed);
       f.rest = 0;
       f.checkT = 2 + this.random() * 2;
       f.checkX = f.x;
@@ -279,7 +285,8 @@ export class PondSimulation {
       const moved = Math.hypot((f.x - f.checkX) * w, (f.y - f.checkY) * h);
       f.checkX = f.x;
       f.checkY = f.y;
-      if (moved < L * 0.4 && f.flee <= 0 && f.rest <= 0 && !f.target) this.escape(f, field);
+      if (moved < L * 0.4 && f.flee <= 0 && f.rest <= 0 && !f.target && f.peck <= 0)
+        this.escape(f, field);
     }
     let gx: number;
     let gy: number;
@@ -287,7 +294,19 @@ export class PondSimulation {
     let turnGain = silver ? 3.5 : 2 * f.temper.turnKeen;
     let maxTurn = silver ? 2.4 : 1.3;
     const sepK = 0.6;
+    const fleeing = f.flee > 0;
     f.flee = Math.max(0, f.flee - dt);
+    if (fleeing && f.flee === 0) {
+      f.wary = 1.2 + random() * 0.8;
+      f.depthGoal = Math.min(0.95, f.depth + 0.25);
+    }
+    if (f.peck > 0) {
+      f.peck -= dt;
+      if (f.peck <= 0) f.depthGoal = f.temper.depthBand;
+    }
+    if (f.peckCd > 0) f.peckCd -= dt;
+    if (f.wary > 0) f.wary -= dt;
+    if (f.chaseCd > 0) f.chaseCd -= dt;
     if (f.flee > 0) {
       gx = Math.cos(f.fleeAngle);
       gy = Math.sin(f.fleeAngle);
@@ -320,6 +339,21 @@ export class PondSimulation {
         this.totalEaten++;
         this.events.push({ type: "eat", x: food.x, y: food.y, fish: f });
       }
+    } else if (f.chase) {
+      const t = f.chase;
+      const dx = t.x * w + Math.cos(t.angle) * t.v * 0.3 - x;
+      const dy = t.y * h + Math.sin(t.angle) * t.v * 0.3 - y;
+      const d = Math.hypot(dx, dy) || 1;
+      gx = dx / d;
+      gy = dy / d;
+      want = 1.7 * f.cruise * L;
+      turnGain = 3;
+      maxTurn = 2.2;
+      f.chaseT -= dt;
+      if (f.chaseT <= 0 || d > L * 6) {
+        f.chase = null;
+        f.chaseCd = 30 + random() * 20;
+      }
     } else {
       f.goalTime -= dt;
       if (!f.goal || f.goalTime <= 0 || Math.hypot(f.goal.x * w - x, f.goal.y * h - y) < L * 1.3)
@@ -333,14 +367,53 @@ export class PondSimulation {
       gx = Math.cos(a);
       gy = Math.sin(a);
       f.rest = Math.max(0, f.rest - dt);
-      if (f.rest <= 0 && random() < dt * 0.02 * f.temper.restRate)
+      if (f.peck <= 0 && f.rest <= 0 && random() < dt * 0.02 * f.temper.restRate)
         f.rest = silver ? 0.6 + random() * 1.2 : 2 + random() * 4;
       want = f.cruise * L * (f.rest > 0 ? 0.12 : 1);
-      if (random() < dt * 0.03)
-        f.depthGoal = silver
-          ? 0.18 + random() * 0.4
-          : clamp(f.temper.depthBand + (random() - 0.5) * 0.4, 0.05, 0.95);
+      if (f.peck > 0) {
+        want *= 0.4;
+        f.depthGoal = 0.97;
+      } else {
+        if (f.peckCd <= 0 && random() < dt * 0.012 * f.temper.restRate) {
+          f.peck = 1.2 + random() * 0.8;
+          f.peckCd = 20 + random() * 15;
+          f.depthGoal = 0.97;
+        }
+        if (f.chase === null && f.chaseCd <= 0 && f.rest <= 0 && random() < dt * 0.008) {
+          const reach = Math.max(w, h) * 0.45;
+          let best: Fish | null = null;
+          let bd = Infinity;
+          for (const o of neighbours) {
+            if (
+              o === f ||
+              o.species !== f.species ||
+              o.chase !== null ||
+              o.rest > 0 ||
+              o.flee > 0 ||
+              f.size / o.size > 1.5 ||
+              o.size / f.size > 1.5
+            )
+              continue;
+            const d = Math.hypot((o.x - f.x) * w, (o.y - f.y) * h);
+            if (d < bd && d < reach) {
+              bd = d;
+              best = o;
+            }
+          }
+          if (best) {
+            f.chase = best;
+            f.chaseT = 1.5 + random() * 1.5;
+            best.flee = 0.5;
+            best.fleeAngle = Math.atan2((best.y - f.y) * h, (best.x - f.x) * w);
+          }
+        }
+        if (f.wary <= 0 && random() < dt * 0.03)
+          f.depthGoal = silver
+            ? 0.18 + random() * 0.4
+            : clamp(f.temper.depthBand + (random() - 0.5) * 0.4, 0.05, 0.95);
+      }
     }
+    if (f.wary > 0) want *= 1.25;
     let sx = 0;
     let sy = 0;
     let ax = 0;
@@ -445,7 +518,8 @@ export class PondSimulation {
     f.amp +=
       (0.14 +
         0.86 * f.thrust * Math.min(1, 0.5 + bl * 0.6) +
-        Math.min(0.4, Math.abs(f.turn) * 0.25) -
+        Math.min(0.4, Math.abs(f.turn) * 0.25) +
+        (f.wary > 0 ? 0.1 : 0) -
         f.amp) *
       Math.min(1, dt * 3);
     const [px, py] = field.inside(
@@ -455,7 +529,7 @@ export class PondSimulation {
     );
     f.x = px / w;
     f.y = py / h;
-    f.depth += (f.depthGoal - f.depth) * Math.min(1, dt * (food ? 1.2 : 0.35));
+    f.depth += (f.depthGoal - f.depth) * Math.min(1, dt * (food ? 1.2 : f.peck > 0 ? 2.4 : 0.35));
     updateSpine(f, s, w, h);
   }
 }

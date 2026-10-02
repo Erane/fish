@@ -538,6 +538,113 @@ describe("过弯漂移", () => {
   });
 });
 
+describe("微行为", () => {
+  it("啄底：触底下潜滞底再上浮，期间自救不触发", () => {
+    const random = randomSeed(59);
+    const f = createFish(0, random);
+    f.x = 0.5;
+    f.y = 0.5;
+    f.angle = 0;
+    const pond = new PondSimulation([f], 1200, 800, random);
+    f.peck = 1.5;
+    f.peckCd = 40;
+    f.depth = 0.5;
+    f.depthGoal = 0.5;
+    f.checkT = 0.2;
+    f.cruise = 0.3;
+    let escaped = false;
+    let dived = false;
+    let rose = false;
+    let ended = false;
+    for (let i = 0; i < 60 * 12; i++) {
+      pond.step(1 / 60);
+      if (f.peck > 0) {
+        if (f.flee > 0) escaped = true;
+        if (f.depth > 0.9) dived = true;
+      } else ended = true;
+      if (ended && f.depth < 0.7) rose = true;
+    }
+    expect(dived).toBe(true);
+    expect(escaped).toBe(false);
+    expect(rose).toBe(true);
+  });
+
+  it("追逐：触发后加速指向目标并驱逃，结束入冷却", () => {
+    const random = randomSeed(61);
+    const a = createFish(0, random);
+    const b = createFish(1, random);
+    const pond = new PondSimulation([a, b], 1200, 800, random);
+    a.x = 0.3;
+    a.y = 0.5;
+    a.angle = 0;
+    b.x = 0.45;
+    b.y = 0.5;
+    b.angle = Math.PI;
+    a.temper = { restRate: 0, wanderAmp: 0, turnKeen: 1, depthBand: 0.5, scullRate: 1 };
+    b.temper = { restRate: 0, wanderAmp: 0, turnKeen: 1, depthBand: 0.5, scullRate: 1 };
+    a.peckCd = 1e9;
+    b.peckCd = 1e9;
+    a.chaseCd = 0;
+    b.chaseCd = 1e9;
+    let sawChase = false;
+    let sawFlee = false;
+    let accelerated = false;
+    let cooled = false;
+    let chasing = false;
+    for (let i = 0; i < 60 * 300 && !cooled; i++) {
+      pond.step(1 / 60);
+      if (a.chase === b) {
+        chasing = true;
+        sawChase = true;
+        if (b.flee > 0) sawFlee = true;
+        const toB = Math.atan2((b.y - a.y) * 800, (b.x - a.x) * 1200);
+        const diff = Math.abs(Math.atan2(Math.sin(toB - a.angle), Math.cos(toB - a.angle)));
+        if (diff < 0.5 && a.v > a.cruise * BODY.length * a.size * pond.scale * 1.2)
+          accelerated = true;
+      } else if (chasing) {
+        if (a.chaseCd > 25) cooled = true;
+        chasing = false;
+      }
+    }
+    expect(sawChase).toBe(true);
+    expect(sawFlee).toBe(true);
+    expect(accelerated).toBe(true);
+    expect(cooled).toBe(true);
+  });
+
+  it("余悸：flee 归零后保持增速偏深，随后缓落", () => {
+    const random = randomSeed(67);
+    const f = createFish(0, random);
+    f.x = 0.5;
+    f.y = 0.5;
+    f.angle = 0;
+    f.temper = { restRate: 0, wanderAmp: 0, turnKeen: 1, depthBand: 0.5, scullRate: 1 };
+    const pond = new PondSimulation([f], 1200, 800, random);
+    f.goal = { x: 0.8, y: 0.5 };
+    f.goalTime = 1e9;
+    f.depth = 0.5;
+    f.depthGoal = 0.5;
+    f.flee = 0.3;
+    let sawWary = false;
+    let deepGoal = true;
+    let fast = true;
+    let settled = false;
+    const cruiseV = (): number => f.cruise * BODY.length * f.size * pond.scale;
+    for (let i = 0; i < 60 * 10; i++) {
+      pond.step(1 / 60);
+      if (f.wary > 0) {
+        sawWary = true;
+        if (f.depthGoal < 0.7) deepGoal = false;
+        if (f.v < cruiseV()) fast = false;
+      } else if (sawWary && !settled && f.v < cruiseV() * 1.15) settled = true;
+    }
+    expect(sawWary).toBe(true);
+    expect(deepGoal).toBe(true);
+    expect(fast).toBe(true);
+    expect(settled).toBe(true);
+  });
+});
+
 describe("重新投放", () => {
   it("respawn 后全员落位开阔、彼此分开且状态归零", () => {
     const random = randomSeed(8);

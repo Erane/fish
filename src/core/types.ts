@@ -72,6 +72,12 @@ export interface Fish extends StoredFish {
   checkY: number;
   flee: number;
   fleeAngle: number;
+  wary: number;
+  peck: number;
+  peckCd: number;
+  chase: Fish | null;
+  chaseT: number;
+  chaseCd: number;
   cruise: number;
   react: number;
   appetite: number;

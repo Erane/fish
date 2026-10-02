@@ -68,6 +68,12 @@ function makeFish(seed: FishSeed, random: () => number): Fish {
     checkY: 0,
     flee: 0,
     fleeAngle: 0,
+    wary: 0,
+    peck: 0,
+    peckCd: peckStagger(seed.seed),
+    chase: null,
+    chaseT: 0,
+    chaseCd: chaseStagger(seed.seed),
     cruise: 0.4,
     react: 0.5,
     appetite: 0.8,
@@ -158,6 +164,14 @@ export function temperOf(seed: number): Temper {
     depthBand: 0.35 + next() * 0.3,
     scullRate: 0.6 + next() * 0.9,
   };
+}
+
+export function peckStagger(seed: number): number {
+  return ((seed * 7919) % 150) / 10;
+}
+
+export function chaseStagger(seed: number): number {
+  return ((seed * 104729) % 250) / 10;
 }
 
 export function updateSpine(f: Fish, s: number, w: number, h: number): void {
