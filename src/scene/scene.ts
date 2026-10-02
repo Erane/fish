@@ -73,7 +73,7 @@ export function finSpread(
     f.rest > 0 || f.thrust < 0.15
       ? side * Math.sin(time * (2.2 + f.temper.scullRate) + f.seed * 0.013) * 0.25
       : 0;
-  return (base + clamp(side * f.turn * 0.35, -0.3, 0.5) + idle) * spreadK;
+  return (base + clamp(side * f.turn * 0.35, -0.35, 0.6) + idle) * spreadK;
 }
 
 export class PondScene {

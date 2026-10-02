@@ -205,6 +205,8 @@ export function fishPose(
   const n = BODY.segments;
   const p = f.spine!;
   const amp = (f.amp || 0) * (silver ? 4.8 : 6.4) * s;
+  const lead = clamp(f.turn * 0.8, -0.6, 0.6);
+  const carve = clamp(f.turn * 2, -5, 5) * s;
   for (let i = 0; i <= n; i++) {
     const a = Math.max(0, i - 1);
     const b = Math.min(n, i + 1);
@@ -218,8 +220,9 @@ export function fishPose(
     const head = 0.12 * Math.pow(Math.max(0, 1 - u / 0.25), 2);
     const lat =
       amp *
-      (env * Math.sin(f.phase - u * (silver ? 6.4 : 5.4)) +
-        head * Math.sin(f.phase * 0.7 - u * 1.8 + 0.9));
+        (env * Math.sin(f.phase - u * (silver ? 6.4 : 5.4)) +
+          head * Math.sin(f.phase * 0.7 - u * 1.8 + 0.9 + lead)) +
+      carve * u;
     out[i * 4] = p[i * 2] - ty * lat;
     out[i * 4 + 1] = p[i * 2 + 1] + tx * lat;
   }

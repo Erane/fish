@@ -10,6 +10,7 @@ import {
   fishPose,
   spineGap,
   temperOf,
+  updateSpine,
   BODY,
   PALETTES,
   type Fish,
@@ -512,6 +513,28 @@ describe("鳍划水", () => {
     for (const [l, r] of vals) cov += (l - ml) * (r - mr);
     expect((maxL - minL) / 0.95).toBeGreaterThan(0.5);
     expect(cov).toBeLessThan(-1);
+  });
+});
+
+describe("过弯漂移", () => {
+  it("转弯时鱼体向弯内漂移，横移随尾部递增", () => {
+    const random = randomSeed(57);
+    const f = createFish(0, random);
+    f.x = 0.5;
+    f.y = 0.5;
+    f.angle = 0;
+    f.amp = 0.6;
+    f.phase = 1.3;
+    updateSpine(f, 1, 1000, 800);
+    f.turn = 0;
+    const base = fishPose(f, 1);
+    f.turn = 1;
+    const carved = fishPose(f, 1);
+    const lat = (pose: Float32Array, i: number): number => pose[i * 4 + 1]! - f.spine![i * 2 + 1]!;
+    const d = (i: number): number => lat(carved, i) - lat(base, i);
+    expect(d(0)).toBeLessThan(d(8));
+    expect(d(8)).toBeLessThan(d(16));
+    expect(d(16)).toBeGreaterThan(1);
   });
 });
 
