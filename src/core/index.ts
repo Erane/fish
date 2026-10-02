@@ -12,7 +12,9 @@ export {
   updateSpine,
   fishPose,
   spineGap,
+  temperOf,
 } from "./fish.ts";
+export type { Temper } from "./types.ts";
 export { PondSimulation } from "./simulation.ts";
 export { pointInPoly, signedDistToPoly, pushInside } from "./boundary.ts";
 export { Field, SHORE, handed, scanHeading } from "./navigator.ts";

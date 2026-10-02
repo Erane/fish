@@ -1,6 +1,6 @@
 import { clamp, TAU, wrap } from "./math.ts";
 import { PALETTES } from "./palette.ts";
-import type { Fish, StoredFish } from "./types.ts";
+import type { Fish, StoredFish, Temper } from "./types.ts";
 
 export const BODY = {
   nose: 34,
@@ -71,10 +71,14 @@ function makeFish(seed: FishSeed, random: () => number): Fish {
     cruise: 0.4,
     react: 0.5,
     appetite: 0.8,
+    temper: temperOf(seed.seed),
     spine: null,
     spineSeg: 0,
   };
-  f.depth = f.species === "silvercarp" ? 0.23 + random() * 0.2 : 0.25 + random() * 0.55;
+  f.depth =
+    f.species === "silvercarp"
+      ? 0.23 + random() * 0.2
+      : clamp(f.temper.depthBand + (random() - 0.5) * 0.5, 0.15, 0.85);
   f.depthGoal = f.depth;
   f.checkX = f.x;
   f.checkY = f.y;
@@ -139,6 +143,21 @@ export function revive(stored: StoredFish, random: () => number = Math.random): 
     },
     random,
   );
+}
+
+export function temperOf(seed: number): Temper {
+  let h = seed | 0;
+  const next = (): number => {
+    h = (h * 1664525 + 1013904223) | 0;
+    return ((h >>> 8) & 0xffff) / 0x10000;
+  };
+  return {
+    restRate: 0.5 + next() * 1.3,
+    wanderAmp: 0.7 + next() * 0.7,
+    turnKeen: 0.8 + next() * 0.5,
+    depthBand: 0.35 + next() * 0.3,
+    scullRate: 0.6 + next() * 0.9,
+  };
 }
 
 export function updateSpine(f: Fish, s: number, w: number, h: number): void {

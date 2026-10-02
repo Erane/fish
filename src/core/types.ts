@@ -41,6 +41,14 @@ export interface Goal {
   y: number;
 }
 
+export interface Temper {
+  restRate: number;
+  wanderAmp: number;
+  turnKeen: number;
+  depthBand: number;
+  scullRate: number;
+}
+
 export interface Fish extends StoredFish {
   species?: "silvercarp";
   x: number;
@@ -67,6 +75,7 @@ export interface Fish extends StoredFish {
   cruise: number;
   react: number;
   appetite: number;
+  temper: Temper;
   spine: Float32Array | null;
   spineSeg: number;
 }

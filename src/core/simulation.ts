@@ -279,12 +279,12 @@ export class PondSimulation {
       const moved = Math.hypot((f.x - f.checkX) * w, (f.y - f.checkY) * h);
       f.checkX = f.x;
       f.checkY = f.y;
-      if (moved < L * 0.4 && f.flee <= 0 && f.rest <= 0) this.escape(f, field);
+      if (moved < L * 0.4 && f.flee <= 0 && f.rest <= 0 && !f.target) this.escape(f, field);
     }
     let gx: number;
     let gy: number;
     let want: number;
-    let turnGain = silver ? 3.5 : 2;
+    let turnGain = silver ? 3.5 : 2 * f.temper.turnKeen;
     let maxTurn = silver ? 2.4 : 1.3;
     const sepK = 0.6;
     f.flee = Math.max(0, f.flee - dt);
@@ -327,16 +327,19 @@ export class PondSimulation {
       const goal = f.goal!;
       const a =
         Math.atan2(goal.y * h - y, goal.x * w - x) +
-        Math.sin(this.time * 0.21 + f.seed) * 0.45 +
-        Math.sin(this.time * 0.53 + f.seed * 1.7) * 0.2;
+        (Math.sin(this.time * 0.21 + f.seed) * 0.45 +
+          Math.sin(this.time * 0.53 + f.seed * 1.7) * 0.2) *
+          f.temper.wanderAmp;
       gx = Math.cos(a);
       gy = Math.sin(a);
       f.rest = Math.max(0, f.rest - dt);
-      if (f.rest <= 0 && random() < dt * 0.02)
+      if (f.rest <= 0 && random() < dt * 0.02 * f.temper.restRate)
         f.rest = silver ? 0.6 + random() * 1.2 : 2 + random() * 4;
       want = f.cruise * L * (f.rest > 0 ? 0.12 : 1);
-      if (random() < dt * 0.015)
-        f.depthGoal = silver ? 0.18 + random() * 0.4 : 0.15 + random() * 0.75;
+      if (random() < dt * 0.03)
+        f.depthGoal = silver
+          ? 0.18 + random() * 0.4
+          : clamp(f.temper.depthBand + (random() - 0.5) * 0.4, 0.05, 0.95);
     }
     let sx = 0;
     let sy = 0;

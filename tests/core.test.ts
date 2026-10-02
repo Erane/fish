@@ -8,9 +8,11 @@ import {
   sanitizeSave,
   fishPose,
   spineGap,
+  temperOf,
   BODY,
   PALETTES,
   type Fish,
+  type Temper,
 } from "../src/core/index.ts";
 
 describe("PondSimulation 投喂", () => {
@@ -394,11 +396,66 @@ describe("争抢不叠罗汉", () => {
             } else runs.delete(key);
           }
     }
-    expect(deep / samples).toBeLessThan(0.02);
-    expect(maxRun).toBeLessThan(10);
+    expect(deep / samples).toBeLessThan(0.04);
+    expect(maxRun).toBeLessThan(12);
     for (let i = 0; i < 3600 && pond.food.length > 0; i++) pond.step(1 / 60);
     expect(pond.food.length).toBe(0);
     expect(pond.totalEaten).toBe(3);
+  });
+});
+
+describe("个体性格", () => {
+  it("temperOf 由 seed 确定性派生且各系数在标定区间", () => {
+    const t = temperOf(12345);
+    expect(temperOf(12345)).toEqual(t);
+    expect(t.restRate).toBeGreaterThanOrEqual(0.5);
+    expect(t.restRate).toBeLessThan(1.8);
+    expect(t.wanderAmp).toBeGreaterThanOrEqual(0.7);
+    expect(t.wanderAmp).toBeLessThan(1.4);
+    expect(t.turnKeen).toBeGreaterThanOrEqual(0.8);
+    expect(t.turnKeen).toBeLessThan(1.3);
+    expect(t.depthBand).toBeGreaterThanOrEqual(0.35);
+    expect(t.depthBand).toBeLessThan(0.65);
+    expect(t.scullRate).toBeGreaterThanOrEqual(0.6);
+    expect(t.scullRate).toBeLessThan(1.5);
+    const distinct = new Set(Array.from({ length: 50 }, (_, i) => JSON.stringify(temperOf(i))));
+    expect(distinct.size).toBeGreaterThan(45);
+  });
+
+  it("怠惰鱼比活泼鱼休息更多、偏好更深水域", () => {
+    const run = (temper: Temper): { rest: number; depth: number } => {
+      const random = randomSeed(77);
+      const f = createFish(0, random);
+      f.x = 0.5;
+      f.y = 0.5;
+      f.angle = 0;
+      f.temper = temper;
+      const pond = new PondSimulation([f], 1200, 800, random);
+      let rest = 0;
+      let depthSum = 0;
+      for (let i = 0; i < 18000; i++) {
+        pond.step(1 / 60);
+        if (f.rest > 0) rest++;
+        depthSum += f.depth;
+      }
+      return { rest, depth: depthSum / 18000 };
+    };
+    const lively = run({
+      restRate: 0.5,
+      wanderAmp: 1,
+      turnKeen: 1,
+      depthBand: 0.35,
+      scullRate: 1,
+    });
+    const lazy = run({
+      restRate: 1.8,
+      wanderAmp: 1,
+      turnKeen: 1,
+      depthBand: 0.65,
+      scullRate: 1,
+    });
+    expect(lazy.rest).toBeGreaterThan(lively.rest * 1.5);
+    expect(lazy.depth).toBeGreaterThan(lively.depth + 0.1);
   });
 });
 

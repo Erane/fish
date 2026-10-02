@@ -20,7 +20,7 @@
 
 ## 灵动性（src/core/fish.ts、simulation.ts、src/scene/scene.ts）
 
-- **L1 个体性格**：纯函数 `temperOf(seed)` 派生 restRate/wanderAmp/turnKeen/depthBand/scullRate，`makeFish` 算一次存 `f.temper`；seed 已持久化，跨会话性格稳定。
+- **L1 个体性格**：纯函数 `temperOf(seed)` 派生 restRate/wanderAmp/turnKeen/depthBand/scullRate，`makeFish` 算一次存 `f.temper`，出生深度即以 depthBand 为中心；接线：休息触发率、巡游漫游幅度、巡游转向增益（惊逃/觅食保持物种统一）、偏好水深采样（depthBand±0.2，约 33s 重采样）；seed 已持久化，跨会话性格稳定；喂食中不触发受困自救（`escape` 加 `!f.target` 门，慢速进食不误判受困）。
 - **L2 头部微摆**：`fishPose` 包络头部由恒 5% 改为叠加约 12% 相对幅度、0.7 倍频、`u=0.25` 处衰减为零的独立摆动；吃食判定用 `f.angle` 航向，不受影响。
 - **L3 转弯侧倾**：过弯漂移横移（pose 级横向偏移，尾部权重更大）+ 微摆相位偏转向转弯侧 + 胸鳍不对称张开调大；不做宽度调制（需动 shader 与 BodyLight，俯视收益不抵成本）。
 - **L4 怠速胸鳍划水**：`scene.ts` 鳍循环内联计算提取为纯函数 `finSpread(f, time, side)`，怠速叠加两侧反相慢摆（频率含 scullRate）。
