@@ -64,6 +64,7 @@ export class PondSimulation {
         vx: Math.cos(a) * r * 0.8,
         vy: Math.sin(a) * r * 0.8,
         eaten: false,
+        claims: 0,
       });
       placed++;
     }
@@ -133,6 +134,7 @@ export class PondSimulation {
       f.beating = false;
       f.goal = null;
       f.goalTime = 0;
+      f.target = null;
       f.flee = 0;
       f.rest = 0;
       f.checkT = 2 + this.random() * 2;
@@ -213,6 +215,7 @@ export class PondSimulation {
     for (const p of this.food) {
       p.life -= dt;
       p.age += dt;
+      p.claims = 0;
       const k = Math.exp(-dt * 1.8);
       p.vx *= k;
       p.vy *= k;
@@ -227,6 +230,29 @@ export class PondSimulation {
     this.food = this.food.filter((p) => p.life > 0 && !p.eaten);
     const sdt = dt * clamp(speedFactor, 0.1, 3);
     const neighbours = this.allFish;
+    for (const f of neighbours) {
+      f.target = null;
+      if (f.species === "silvercarp") continue;
+      const s = f.size * this.scale;
+      const mx = f.x * this.width + Math.cos(f.angle) * BODY.nose * s;
+      const my = f.y * this.height + Math.sin(f.angle) * BODY.nose * s;
+      const reach = Math.max(this.width, this.height) * f.appetite;
+      let best: Food | null = null;
+      let fd = Infinity;
+      for (const p of this.food) {
+        if (p.eaten) continue;
+        const d = Math.hypot(p.x - mx, p.y - my);
+        const score = d * (1 + 0.6 * p.claims);
+        if (score < fd && d < reach && p.age > f.react + d / 650) {
+          fd = score;
+          best = p;
+        }
+      }
+      if (best) {
+        best.claims++;
+        f.target = best;
+      }
+    }
     for (const f of neighbours) this.swim(f, sdt, field, neighbours);
     if (this.food.some((p) => p.eaten)) this.food = this.food.filter((p) => !p.eaten);
   }
@@ -244,18 +270,9 @@ export class PondSimulation {
     const sin = Math.sin(f.angle);
     const mx = x + cos * BODY.nose * s;
     const my = y + sin * BODY.nose * s;
-    let food: Food | null = null;
-    let fd = Infinity;
-    const reach = Math.max(w, h) * f.appetite;
-    const candidates: Food[] = silver ? [] : this.food;
-    for (const p of candidates) {
-      if (p.eaten) continue;
-      const d = Math.hypot(p.x - mx, p.y - my);
-      if (d < fd && d < reach && p.age > f.react + d / 650) {
-        fd = d;
-        food = p;
-      }
-    }
+    let food: Food | null = silver ? null : f.target;
+    if (food && (food.eaten || food.life <= 0)) food = null;
+    const fd = food ? Math.hypot(food.x - mx, food.y - my) : Infinity;
     f.checkT -= dt;
     if (f.checkT <= 0) {
       f.checkT = 2 + random() * 2;
@@ -269,7 +286,7 @@ export class PondSimulation {
     let want: number;
     let turnGain = silver ? 3.5 : 2;
     let maxTurn = silver ? 2.4 : 1.3;
-    let sepK = 0.6;
+    const sepK = 0.6;
     f.flee = Math.max(0, f.flee - dt);
     if (f.flee > 0) {
       gx = Math.cos(f.fleeAngle);
@@ -278,17 +295,17 @@ export class PondSimulation {
       turnGain = 9;
       maxTurn = 7;
     } else if (food) {
-      const fx = food as Food;
-      const dx = fx.x - x;
-      const dy = fx.y - y;
+      const dx = food.x - x;
+      const dy = food.y - y;
       const d = Math.hypot(dx, dy) || 1;
       const err = Math.abs(wrap(Math.atan2(dy, dx) - f.angle));
       gx = dx / d;
       gy = dy / d;
       want =
-        clamp((fd / L) * 1.3, 0.25, 2.2) *
-        L *
-        Math.max(0.12, Math.cos(Math.min(err, Math.PI / 2)) ** 2);
+        (clamp((fd / L) * 1.3, 0.25, 2.2) *
+          L *
+          Math.max(0.12, Math.cos(Math.min(err, Math.PI / 2)) ** 2)) /
+        (1 + 0.7 * (food.claims - 1));
       if (d < BODY.nose * s * 1.15 && err > 0.6) {
         gx = cos;
         gy = sin;
@@ -296,13 +313,12 @@ export class PondSimulation {
       }
       turnGain = 4.5;
       maxTurn = 3.4;
-      sepK = 1;
       f.depthGoal = 0.04;
       if (fd < Math.max(6, 7 * s)) {
-        fx.eaten = true;
+        food.eaten = true;
         f.eaten++;
         this.totalEaten++;
-        this.events.push({ type: "eat", x: fx.x, y: fx.y, fish: f });
+        this.events.push({ type: "eat", x: food.x, y: food.y, fish: f });
       }
     } else {
       f.goalTime -= dt;

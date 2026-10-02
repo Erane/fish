@@ -57,6 +57,7 @@ export interface Fish extends StoredFish {
   depthGoal: number;
   goal: Goal | null;
   goalTime: number;
+  target: Food | null;
   rest: number;
   checkT: number;
   checkX: number;
@@ -79,6 +80,7 @@ export interface Food {
   vx: number;
   vy: number;
   eaten: boolean;
+  claims: number;
 }
 
 export interface Obstacle {

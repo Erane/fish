@@ -61,6 +61,7 @@ function makeFish(seed: FishSeed, random: () => number): Fish {
     depthGoal: 0.5,
     goal: null,
     goalTime: 0,
+    target: null,
     rest: 0,
     checkT: 2 + random() * 2,
     checkX: 0,

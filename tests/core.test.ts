@@ -353,6 +353,55 @@ describe("密集稳定性", () => {
   });
 });
 
+describe("争抢不叠罗汉", () => {
+  it("6 鱼抢 3 颗近邻饲料：争抢期不深度叠压且全部吃完", () => {
+    const random = randomSeed(41);
+    const fish = Array.from({ length: 6 }, (_, i) => createFish(i, random));
+    const pond = new PondSimulation(fish, 1200, 800, random);
+    for (let i = 0; i < fish.length; i++) {
+      const f = fish[i]!;
+      const a = (i / fish.length) * Math.PI * 2;
+      f.x = 0.5 + Math.cos(a) * 0.15;
+      f.y = 0.5 + Math.sin(a) * 0.15;
+      f.angle = a + Math.PI;
+    }
+    pond.feed(600, 400, 3);
+    expect(pond.food.length).toBe(3);
+    let deep = 0;
+    let samples = 0;
+    let maxRun = 0;
+    const runs = new Map<string, number>();
+    for (let i = 0; i < 360; i++) {
+      pond.step(1 / 60);
+      if (i % 5 === 0)
+        for (let a = 0; a < fish.length; a++)
+          for (let b = a + 1; b < fish.length; b++) {
+            if (Math.abs(fish[a]!.depth - fish[b]!.depth) > 0.35) continue;
+            const g = spineGap(
+              fish[a]!,
+              fish[b]!,
+              fish[a]!.size * pond.scale,
+              fish[b]!.size * pond.scale,
+            );
+            if (!g) continue;
+            samples++;
+            const key = `${a}-${b}`;
+            if (g.gap < -3) {
+              deep++;
+              const r = (runs.get(key) ?? 0) + 1;
+              runs.set(key, r);
+              if (r > maxRun) maxRun = r;
+            } else runs.delete(key);
+          }
+    }
+    expect(deep / samples).toBeLessThan(0.02);
+    expect(maxRun).toBeLessThan(10);
+    for (let i = 0; i < 3600 && pond.food.length > 0; i++) pond.step(1 / 60);
+    expect(pond.food.length).toBe(0);
+    expect(pond.totalEaten).toBe(3);
+  });
+});
+
 describe("重新投放", () => {
   it("respawn 后全员落位开阔、彼此分开且状态归零", () => {
     const random = randomSeed(8);
