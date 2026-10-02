@@ -336,7 +336,7 @@ export class PondSimulation {
       const d = Math.hypot(ox, oy);
       if (d < 1e-6) continue;
       const R = (L + BODY.length * o.size * this.scale) * 0.52;
-      const near = 1 - Math.min(1, Math.abs(o.depth - f.depth) * 1.6);
+      const near = Math.max(0.15, 1 - Math.min(1, Math.abs(o.depth - f.depth) * 1.6));
       if (d < R) {
         const k = (1 - d / R) ** 2 * near;
         sx -= (ox / d) * k;

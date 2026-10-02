@@ -433,10 +433,10 @@ export class PondScene {
     const pose = fishPose(f, s, this.pose);
     const cx = f.x * this.w;
     const cy = f.y * this.h;
-    const k = 1 - f.depth * 0.09;
-    const fogA = 0.03 + col * 0.3;
+    const k = 1 - f.depth * 0.18;
+    const fogA = 0.05 + col * 0.45;
     const fog: Vec4 = [look.water[0], look.water[1], look.water[2], fogA];
-    const off = (6 + (1 - f.depth) * 30) * this.scale;
+    const off = (6 + (1 - f.depth) * 42) * this.scale;
     const dx = look.shadowDir[0] * off;
     const dy = look.shadowDir[1] * off;
     const sh: Vec4 = [0, 0, 0, 0.92 - (1 - f.depth) * 0.22];

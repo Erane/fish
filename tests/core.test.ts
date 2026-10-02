@@ -173,6 +173,69 @@ describe("受困自救", () => {
   });
 });
 
+describe("深度分离", () => {
+  const L = BODY.length * 0.8;
+  const W = 1000;
+  const H = 700;
+
+  function fleeFish(f: Fish, x: number, y: number, angle: number, depth: number): void {
+    f.size = 0.8;
+    f.x = x;
+    f.y = y;
+    f.angle = angle;
+    f.fleeAngle = angle;
+    f.flee = 9;
+    f.v = 150;
+    f.goal = null;
+    f.checkT = 1e9;
+    f.depth = depth;
+    f.depthGoal = depth;
+  }
+
+  it("深度差 0.5 的并行鱼会彼此推开", () => {
+    const random = randomSeed(11);
+    const a = createFish(0, random);
+    const b = createFish(1, random);
+    const pond = new PondSimulation([a, b], W, H, random);
+    fleeFish(a, 0.35, 0.5 - (0.15 * L) / H, 0, 0.1);
+    fleeFish(b, 0.35, 0.5 + (0.15 * L) / H, 0, 0.6);
+    const d0 = Math.abs(a.y - b.y) * H;
+    for (let i = 0; i < 150; i++) pond.step(1 / 60);
+    expect(Math.abs(a.y - b.y) * H).toBeGreaterThan(d0 * 2);
+  });
+
+  it("深度差 0.8 的并行鱼靠深度分离下限仍然彼此推开", () => {
+    const random = randomSeed(11);
+    const a = createFish(0, random);
+    const b = createFish(1, random);
+    const pond = new PondSimulation([a, b], W, H, random);
+    fleeFish(a, 0.35, 0.5 - (0.15 * L) / H, 0, 0.1);
+    fleeFish(b, 0.35, 0.5 + (0.15 * L) / H, 0, 0.9);
+    const d0 = Math.abs(a.y - b.y) * H;
+    for (let i = 0; i < 150; i++) pond.step(1 / 60);
+    expect(Math.abs(a.y - b.y) * H).toBeGreaterThan(d0 * 2);
+  });
+
+  it("深度差 0.8 的相向鱼可以叠游穿越", () => {
+    const random = randomSeed(13);
+    const a = createFish(0, random);
+    const b = createFish(1, random);
+    const pond = new PondSimulation([a, b], W, H, random);
+    fleeFish(a, 0.25, 0.5, 0, 0.1);
+    fleeFish(b, 0.75, 0.5, Math.PI, 0.9);
+    let minD = Infinity;
+    for (let i = 0; i < 180; i++) {
+      pond.step(1 / 60);
+      minD = Math.min(minD, Math.hypot((a.x - b.x) * W, (a.y - b.y) * H));
+    }
+    expect(minD).toBeLessThan(L * 2 * 0.35);
+    for (const f of [a, b]) {
+      expect(Number.isFinite(f.x)).toBe(true);
+      expect(Number.isFinite(f.angle)).toBe(true);
+    }
+  });
+});
+
 describe("重新投放", () => {
   it("respawn 后全员落位开阔、彼此分开且状态归零", () => {
     const random = randomSeed(8);
