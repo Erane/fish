@@ -215,7 +215,11 @@ export function fishPose(
     ty /= l;
     const u = i / n;
     const env = 0.05 + 0.95 * Math.pow(Math.max(0, (u - 0.2) / 0.8), 1.5);
-    const lat = amp * env * Math.sin(f.phase - u * (silver ? 6.4 : 5.4));
+    const head = 0.12 * Math.pow(Math.max(0, 1 - u / 0.25), 2);
+    const lat =
+      amp *
+      (env * Math.sin(f.phase - u * (silver ? 6.4 : 5.4)) +
+        head * Math.sin(f.phase * 0.7 - u * 1.8 + 0.9));
     out[i * 4] = p[i * 2] - ty * lat;
     out[i * 4 + 1] = p[i * 2 + 1] + tx * lat;
   }

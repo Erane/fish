@@ -459,6 +459,32 @@ describe("个体性格", () => {
   });
 });
 
+describe("头部微摆", () => {
+  it("直游时头段横摆含独立于尾波的微摆分量", () => {
+    const random = randomSeed(51);
+    const f = createFish(0, random);
+    f.x = 0.5;
+    f.y = 0.5;
+    f.angle = 0;
+    f.temper = { restRate: 0, wanderAmp: 0, turnKeen: 1, depthBand: 0.5, scullRate: 1 };
+    const pond = new PondSimulation([f], 4000, 3000, random);
+    f.goal = { x: 0.9, y: 0.5 };
+    f.goalTime = 1e9;
+    let maxHead = 0;
+    let maxTail = 0;
+    for (let i = 0; i < 300; i++) {
+      pond.step(1 / 60);
+      const pose = fishPose(f, f.size * pond.scale);
+      const p = f.spine!;
+      const head = Math.hypot(pose[0]! - p[0], pose[1]! - p[1]);
+      const tail = Math.hypot(pose[64]! - p[32], pose[65]! - p[33]);
+      if (head > maxHead) maxHead = head;
+      if (tail > maxTail) maxTail = tail;
+    }
+    expect(maxHead / maxTail).toBeGreaterThan(0.12);
+  });
+});
+
 describe("重新投放", () => {
   it("respawn 后全员落位开阔、彼此分开且状态归零", () => {
     const random = randomSeed(8);
