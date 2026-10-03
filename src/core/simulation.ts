@@ -142,6 +142,7 @@ export class PondSimulation {
       f.chase = null;
       f.chaseT = 0;
       f.chaseCd = chaseStagger(f.seed);
+      f.foodGlow = 0;
       f.rest = 0;
       f.checkT = 2 + this.random() * 2;
       f.checkX = f.x;
@@ -265,6 +266,8 @@ export class PondSimulation {
     dt = clamp(dt, 0, 0.05);
     this.time += dt;
     const field = this.field;
+    const w = this.width;
+    const h = this.height;
     const pellet = BODY.length * this.scale;
     for (const p of this.food) {
       p.life -= dt;
@@ -284,20 +287,39 @@ export class PondSimulation {
     this.food = this.food.filter((p) => p.life > 0 && !p.eaten);
     const sdt = dt * clamp(speedFactor, 0.1, 3);
     const neighbours = this.allFish;
+    for (const f of neighbours) f.foodGlow = Math.max(0, f.foodGlow - sdt);
+    const span = Math.max(w, h);
     for (const f of neighbours) {
       f.target = null;
       if (f.species === "silvercarp") continue;
       const s = f.size * this.scale;
-      const mx = f.x * this.width + Math.cos(f.angle) * BODY.nose * s;
-      const my = f.y * this.height + Math.sin(f.angle) * BODY.nose * s;
-      const reach = Math.max(this.width, this.height) * f.appetite;
+      const L = BODY.length * s;
+      const mx = f.x * w + Math.cos(f.angle) * BODY.nose * s;
+      const my = f.y * h + Math.sin(f.angle) * BODY.nose * s;
+      let cue = false;
+      const cueR = L * 8;
+      for (const o of neighbours) {
+        if (o === f || o.foodGlow <= 0) continue;
+        if (Math.hypot((o.x - f.x) * w, (o.y - f.y) * h) < cueR) {
+          cue = true;
+          break;
+        }
+      }
+      const lockReach = span * (0.16 + 0.2 * f.appetite) * (cue ? 2 : 1);
+      const smellReach = span * 1.25;
       let best: Food | null = null;
       let fd = Infinity;
+      let sniff: Food | null = null;
+      let sd = Infinity;
       for (const p of this.food) {
         if (p.eaten) continue;
         const d = Math.hypot(p.x - mx, p.y - my);
+        if (d < smellReach && d < sd && p.age > f.react * 2 + d / 650) {
+          sd = d;
+          sniff = p;
+        }
         const score = d * (1 + 0.6 * p.claims);
-        if (score < fd && d < reach && p.age > f.react + d / 650) {
+        if (score < fd && d < lockReach && p.age > f.react * (cue ? 0.3 : 1) + d / 650) {
           fd = score;
           best = p;
         }
@@ -305,6 +327,11 @@ export class PondSimulation {
       if (best) {
         best.claims++;
         f.target = best;
+        f.foodGlow = 3;
+      } else if (sniff) {
+        f.goal = { x: sniff.x / w, y: sniff.y / h };
+        f.goalTime = 2;
+        f.foodGlow = Math.max(f.foodGlow, 1.2);
       }
     }
     for (const f of neighbours) this.swim(f, sdt, field, neighbours);
@@ -370,7 +397,8 @@ export class PondSimulation {
       want =
         (clamp((fd / L) * 1.3, 0.25, 2.2) *
           L *
-          Math.max(0.12, Math.cos(Math.min(err, Math.PI / 2)) ** 2)) /
+          Math.max(0.12, Math.cos(Math.min(err, Math.PI / 2)) ** 2) *
+          f.feedDrive) /
         (1 + 0.7 * (food.claims - 1));
       if (d < BODY.nose * s * 1.15 && err > 0.6) {
         gx = cos;
@@ -379,7 +407,9 @@ export class PondSimulation {
       }
       turnGain = 4.5;
       maxTurn = 3.4;
-      f.depthGoal = 0.04 + (f.seed % 8) * 0.05;
+      const surface = 0.04 + (f.seed % 8) * 0.05;
+      const t = clamp((fd - L * 2) / (L * 8), 0, 1);
+      f.depthGoal = surface * (1 - t) + f.temper.depthBand * t;
       if (fd < Math.max(6, 7 * s)) {
         food.eaten = true;
         f.eaten++;
@@ -416,7 +446,7 @@ export class PondSimulation {
       f.rest = Math.max(0, f.rest - dt);
       if (f.peck <= 0 && f.rest <= 0 && random() < dt * 0.02 * f.temper.restRate)
         f.rest = silver ? 0.6 + random() * 1.2 : 2 + random() * 4;
-      want = f.cruise * L * (f.rest > 0 ? 0.12 : 1);
+      want = f.cruise * L * (f.rest > 0 ? 0.12 : 1) * (f.foodGlow > 0 ? 1.6 : 1);
       if (f.peck > 0) {
         want *= 0.4;
         f.depthGoal = 0.97;

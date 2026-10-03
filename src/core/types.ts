@@ -81,6 +81,8 @@ export interface Fish extends StoredFish {
   cruise: number;
   react: number;
   appetite: number;
+  feedDrive: number;
+  foodGlow: number;
   temper: Temper;
   spine: Float32Array | null;
   spineSeg: number;

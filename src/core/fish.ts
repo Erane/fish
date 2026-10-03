@@ -77,6 +77,8 @@ function makeFish(seed: FishSeed, random: () => number): Fish {
     cruise: 0.4,
     react: 0.5,
     appetite: 0.8,
+    feedDrive: 1,
+    foodGlow: 0,
     temper: temperOf(seed.seed),
     spine: null,
     spineSeg: 0,
@@ -90,7 +92,8 @@ function makeFish(seed: FishSeed, random: () => number): Fish {
   f.checkY = f.y;
   f.cruise = (0.3 + random() * 0.22) * clamp(f.speed || 1, 0.5, 1.5);
   f.react = 0.15 + random() * 0.9;
-  f.appetite = 0.55 + random() * 0.45;
+  f.appetite = 0.35 + random() * 0.65;
+  f.feedDrive = 0.75 + (((seed.seed * 48271) % 997) / 997) * 0.5;
   return f;
 }
 

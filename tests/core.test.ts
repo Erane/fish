@@ -57,6 +57,139 @@ describe("PondSimulation 投喂", () => {
   });
 });
 
+describe("进食感知", () => {
+  it("投喂后近鱼先锁定冲食，远鱼不获目标、渐进接近且保持惯常水层", () => {
+    const random = randomSeed(71);
+    const near = createFish(0, random);
+    near.seed = 8;
+    near.size = 0.8;
+    near.appetite = 1;
+    near.react = 0.1;
+    near.cruise = 0.4;
+    near.x = 2016 / 4000;
+    near.y = 0.5;
+    near.angle = 0;
+    const far = createFish(1, random);
+    far.seed = 15;
+    far.size = 0.9;
+    far.appetite = 1;
+    far.react = 0.1;
+    far.cruise = 0.35;
+    far.temper = { restRate: 0, wanderAmp: 1, turnKeen: 1, depthBand: 0.5, scullRate: 1 };
+    far.depth = 0.5;
+    far.depthGoal = 0.5;
+    far.x = 600 / 4000;
+    far.y = 2900 / 3000;
+    far.angle = Math.atan2(1500 - 2900, 2100 - 600);
+    const pond = new PondSimulation([near, far], 4000, 3000, random);
+    pond.feed(2100, 1500, 30);
+    for (let i = 0; i < 36; i++) pond.step(1 / 60);
+    expect(near.target).not.toBeNull();
+    const dist = (): number =>
+      Math.hypot((far.x - 2100 / 4000) * 4000, (far.y - 1500 / 3000) * 3000);
+    const start = dist();
+    let goalSum = 0;
+    let goalN = 0;
+    for (let i = 0; i < 60 * 8; i++) {
+      pond.step(1 / 60);
+      if (!far.target) {
+        goalSum += far.depthGoal;
+        goalN++;
+      }
+    }
+    expect(far.target).toBeNull();
+    expect(dist()).toBeLessThan(start - 100);
+    expect(goalSum / goalN).toBeGreaterThan(0.35);
+    expect(near.depth).toBeLessThan(0.35);
+    expect(far.depth).toBeGreaterThan(near.depth + 0.15);
+  });
+
+  it("锁定半径外无目标但嗅探锚定食物区，游近后转锁定", () => {
+    const random = randomSeed(73);
+    const f = createFish(0, random);
+    f.size = 1;
+    f.appetite = 1;
+    f.react = 0.1;
+    f.cruise = 0.4;
+    f.x = 0.5;
+    f.y = 0.5;
+    f.angle = 0;
+    const pond = new PondSimulation([f], 4000, 3000, random);
+    pond.feed(3800, 1500, 4);
+    for (let i = 0; i < 180; i++) pond.step(1 / 60);
+    expect(f.target).toBeNull();
+    expect(f.goal).not.toBeNull();
+    const gap = Math.min(
+      ...pond.food.map((p) => Math.hypot(f.goal!.x * 4000 - p.x, f.goal!.y * 3000 - p.y)),
+    );
+    expect(gap).toBeLessThan(10);
+    f.x = 2900 / 4000;
+    f.y = 0.5;
+    f.angle = 0;
+    for (let i = 0; i < 120; i++) pond.step(1 / 60);
+    expect(f.target).not.toBeNull();
+  });
+
+  it("feedDrive 驱动冲食速度分化且派生区间受控", () => {
+    const race = (drive: number): { d: number; v: number } => {
+      const random = randomSeed(75);
+      const f = createFish(0, random);
+      f.size = 1;
+      f.appetite = 1;
+      f.react = 0.1;
+      f.cruise = 0.4;
+      f.feedDrive = drive;
+      f.temper = { restRate: 0, wanderAmp: 0, turnKeen: 1, depthBand: 0.5, scullRate: 1 };
+      f.x = 0.5;
+      f.y = 0.5;
+      f.angle = 0;
+      const pond = new PondSimulation([f], 4000, 3000, random);
+      pond.feed(2600, 1500, 4);
+      for (let i = 0; i < 120; i++) pond.step(1 / 60);
+      return { d: Math.hypot(f.x * 4000 - 2600, f.y * 3000 - 1500), v: f.v };
+    };
+    const fast = race(1.25);
+    const slow = race(0.75);
+    expect(fast.d).toBeLessThan(slow.d - 60);
+    expect(fast.v).toBeGreaterThan(slow.v * 1.2);
+    const random = randomSeed(77);
+    for (let i = 0; i < 50; i++) {
+      const f = createFish(i, random);
+      expect(f.feedDrive).toBeGreaterThanOrEqual(0.75);
+      expect(f.feedDrive).toBeLessThan(1.25);
+      expect(f.appetite).toBeGreaterThanOrEqual(0.35);
+      expect(f.appetite).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("进食邻居觉醒周边鱼，孤鱼同距未锁定", () => {
+    const run = (withEater: boolean): Fish => {
+      const random = randomSeed(79);
+      const eater = createFish(0, random);
+      eater.size = 1;
+      eater.appetite = 1;
+      eater.react = 0.1;
+      eater.x = 520 / 1200;
+      eater.y = 0.5;
+      eater.angle = 0;
+      const far = createFish(1, random);
+      far.size = 1;
+      far.appetite = 1;
+      far.react = 0.1;
+      far.cruise = 0.4;
+      far.x = 1150 / 1200;
+      far.y = 0.5;
+      far.angle = Math.PI;
+      const pond = new PondSimulation(withEater ? [eater, far] : [far], 1200, 800, random);
+      pond.feed(600, 400, 4);
+      for (let i = 0; i < 90; i++) pond.step(1 / 60);
+      return far;
+    };
+    expect(run(true).target).not.toBeNull();
+    expect(run(false).target).toBeNull();
+  });
+});
+
 describe("游动稳定性", () => {
   it("长时间游动保持边界与数值稳定", () => {
     const random = randomSeed(4);
