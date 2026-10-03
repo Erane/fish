@@ -395,11 +395,10 @@ export class PondSimulation {
       gx = dx / d;
       gy = dy / d;
       want =
-        (clamp((fd / L) * 1.3, 0.25, 2.2) *
-          L *
-          Math.max(0.12, Math.cos(Math.min(err, Math.PI / 2)) ** 2) *
-          f.feedDrive) /
-        (1 + 0.7 * (food.claims - 1));
+        clamp((fd / L) * 1.3, 0.25, 2.2) *
+        L *
+        Math.max(0.12, Math.cos(Math.min(err, Math.PI / 2)) ** 2) *
+        f.feedDrive;
       if (d < BODY.nose * s * 1.15 && err > 0.6) {
         gx = cos;
         gy = sin;

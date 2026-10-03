@@ -188,6 +188,48 @@ describe("进食感知", () => {
     expect(run(true).target).not.toBeNull();
     expect(run(false).target).toBeNull();
   });
+
+  it("多鱼同抢一颗饲料保持冲刺不谦让，饲料秒级被夺", () => {
+    const race = (count: number): { v: number; frames: number } => {
+      const random = randomSeed(83);
+      const fish = Array.from({ length: count }, (_, i) => {
+        const f = createFish(i, random);
+        f.size = 1;
+        f.appetite = 1;
+        f.react = 0.1;
+        f.cruise = 0.4;
+        f.feedDrive = 1;
+        f.peckCd = 1e9;
+        f.chaseCd = 1e9;
+        f.temper = { restRate: 0, wanderAmp: 0, turnKeen: 1, depthBand: 0.5, scullRate: 1 };
+        const a = (i / count) * Math.PI * 2;
+        f.x = 0.5 + Math.cos(a) * 0.1;
+        f.y = 0.5 + Math.sin(a) * 0.1;
+        f.angle = a + Math.PI;
+        return f;
+      });
+      const pond = new PondSimulation(fish, 2000, 2000, random);
+      pond.feed(1000, 1000, 1);
+      let vSum = 0;
+      let vN = 0;
+      let frames = 0;
+      while (pond.food.length > 0 && frames < 600) {
+        pond.step(1 / 60);
+        frames++;
+        if (frames <= 60)
+          for (const f of fish) {
+            vSum += f.v;
+            vN++;
+          }
+      }
+      return { v: vSum / vN, frames };
+    };
+    const solo = race(1);
+    const pack = race(6);
+    expect(pack.v).toBeGreaterThan(solo.v * 0.75);
+    expect(pack.frames).toBeLessThan(150);
+    expect(solo.frames).toBeLessThan(240);
+  });
 });
 
 describe("游动稳定性", () => {
