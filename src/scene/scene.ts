@@ -451,6 +451,7 @@ export class PondScene {
     this.fenv = { weather, rainK, calm: this.calm, scale, w, h, time: this.time };
     this.floaters.update(dt, this.fenv);
     this.creatures.update(dt, settings, this.time);
+    this.sim.obstacles = this.creatures.obstacles();
   }
 
   private koi(f: Fish, cell: number, col: number): void {

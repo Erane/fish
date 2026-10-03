@@ -13,6 +13,7 @@ import {
   updateSpine,
   BODY,
   PALETTES,
+  clamp,
   type Fish,
   type Temper,
 } from "../src/core/index.ts";
@@ -406,6 +407,84 @@ describe("争抢不叠罗汉", () => {
   });
 });
 
+describe("堆叠解缠", () => {
+  const W = 1200;
+  const H = 800;
+
+  function longestJams(
+    fish: Fish[],
+    pond: PondSimulation,
+    seconds: number,
+    warm: number,
+  ): number[] {
+    const run = fish.map(() => 0);
+    const longest = fish.map(() => 0);
+    for (let i = 0; i < 60 * seconds; i++) {
+      pond.step(1 / 60);
+      if (i < 60 * warm) continue;
+      for (let k = 0; k < fish.length; k++) {
+        const f = fish[k]!;
+        let nn = Infinity;
+        for (const o of fish) {
+          if (o === f) continue;
+          nn = Math.min(nn, Math.hypot((o.x - f.x) * W, (o.y - f.y) * H));
+        }
+        if (nn < BODY.length * f.size * pond.scale * 0.6) {
+          run[k]!++;
+          longest[k] = Math.max(longest[k]!, run[k]!);
+        } else run[k] = 0;
+      }
+    }
+    return longest.map((v) => v / 60);
+  }
+
+  const median = (a: number[]): number => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)]!;
+
+  it("密集鱼群中单次堵塞不超上限，堆心鱼能持续游走", () => {
+    const random = randomSeed(607);
+    const fish = Array.from({ length: 16 }, (_, i) => createFish(i, random));
+    const pond = new PondSimulation(fish, W, H, random);
+    for (const f of fish) {
+      f.x = 0.35 + random() * 0.3;
+      f.y = 0.35 + random() * 0.3;
+    }
+    expect(median(longestJams(fish, pond, 90, 5))).toBeLessThan(5);
+  });
+
+  it("投喂聚集后鱼群散得开，不滞留在餐点附近", () => {
+    const W = 1200;
+    const H = 800;
+    const tailNN = (seed: number): number => {
+      const random = randomSeed(seed);
+      const fish = Array.from({ length: 5 }, (_, i) => createFish(i, random));
+      const pond = new PondSimulation(fish, W, H, random, createSilverCarpShoal(random), true);
+      pond.feed(600, 400, 9);
+      pond.feed(600, 400, 9);
+      pond.feed(600, 400, 9);
+      let sum = 0;
+      let n = 0;
+      for (let i = 0; i < 60 * 130; i++) {
+        pond.step(1 / 60);
+        if (i < 60 * 100) continue;
+        let nnSum = 0;
+        for (const f of fish) {
+          let nn = Infinity;
+          for (const o of fish) {
+            if (o === f) continue;
+            nn = Math.min(nn, Math.hypot((o.x - f.x) * W, (o.y - f.y) * H));
+          }
+          nnSum += nn;
+        }
+        sum += nnSum / fish.length;
+        n++;
+      }
+      return sum / n;
+    };
+    const vals = [601, 602, 603, 604].map((s) => tailNN(s + 1000));
+    expect(median(vals)).toBeGreaterThan(195);
+  });
+});
+
 describe("个体性格", () => {
   it("temperOf 由 seed 确定性派生且各系数在标定区间", () => {
     const t = temperOf(12345);
@@ -591,8 +670,18 @@ describe("微行为", () => {
     let accelerated = false;
     let cooled = false;
     let chasing = false;
-    for (let i = 0; i < 60 * 300 && !cooled; i++) {
+    for (let i = 0; i < 60 * 600 && !cooled; i++) {
       pond.step(1 / 60);
+      if (!chasing) {
+        const dx = (b.x - a.x) * 1200;
+        const dy = (b.y - a.y) * 800;
+        const d = Math.hypot(dx, dy);
+        const near = BODY.length * a.size * pond.scale * 2;
+        if (d > near) {
+          a.x = clamp(a.x + ((dx / d) * (d - near)) / 1200, 0.1, 0.9);
+          a.y = clamp(a.y + ((dy / d) * (d - near)) / 800, 0.1, 0.9);
+        }
+      }
       if (a.chase === b) {
         chasing = true;
         sawChase = true;

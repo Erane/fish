@@ -50,6 +50,10 @@ export class Turtle {
     return [this.x * w + Math.cos(this.angle) * d, this.y * h + Math.sin(this.angle) * d];
   }
 
+  radius(scale: number): number {
+    return 22 * scale * this.size;
+  }
+
   update(
     dt: number,
     w: number,
@@ -747,6 +751,8 @@ export class Creatures {
   private showCrabs = false;
   private flying = false;
   private dragonflyOn = false;
+  private turtlesOn = false;
+  private rocks: Obstacle[] = [];
 
   constructor(
     R: Renderer,
@@ -806,7 +812,16 @@ export class Creatures {
       const [sx, sy] = R.imageToScreen(a.x * this.bedW, a.y * this.bedH);
       obstacles.push({ x: sx, y: sy, r: a.r * this.m * this.k });
     }
+    this.rocks = obstacles;
     return obstacles;
+  }
+
+  obstacles(): Obstacle[] {
+    if (!this.turtlesOn) return this.rocks;
+    return [
+      ...this.rocks,
+      ...this.turtles.map((t) => ({ x: t.x * this.w, y: t.y * this.h, r: t.radius(this.scale) })),
+    ];
   }
 
   startle(x: number, y: number): void {
@@ -817,6 +832,7 @@ export class Creatures {
     const { w, h, scale } = this;
     const weather = settings.weather;
     const night = settings.night;
+    this.turtlesOn = settings.turtles;
     if (settings.turtles)
       for (const t of this.turtles) t.update(dt, w, h, scale, time, this.stir, this.turtles);
     this.showCrabs = settings.crabs;

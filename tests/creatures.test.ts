@@ -66,6 +66,30 @@ describe("Creatures", () => {
     expect(obstacles[0]!.r).toBeGreaterThan(0);
   });
 
+  it("乌龟按当前游速位置成为软障碍，并随设置开关", () => {
+    const c = new Creatures(
+      stubR({}),
+      ROCK_ANCHORS,
+      1600,
+      900,
+      () => {},
+      () => 0.5,
+    );
+    c.layout(1600, 900, 1);
+    for (let i = 0; i < 30; i++)
+      c.update(0.05, settings({ turtles: true, crabs: false, butterflies: false }), i * 0.05);
+    const obstacles = c.obstacles();
+    expect(obstacles.length).toBe(4);
+    const turtles = obstacles.slice(2);
+    for (const t of turtles) {
+      expect(t.r).toBeGreaterThan(0);
+      expect(Number.isFinite(t.x)).toBe(true);
+      expect(Number.isFinite(t.y)).toBe(true);
+    }
+    c.update(0.05, settings({ turtles: false, crabs: false, butterflies: false }), 2);
+    expect(c.obstacles().length).toBe(2);
+  });
+
   it("lights fireflies in the air at night", () => {
     const counts: Record<string, number> = {};
     const c = new Creatures(

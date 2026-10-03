@@ -132,6 +132,9 @@ export class PondSimulation {
       f.turn = 0;
       f.thrust = 0;
       f.beating = false;
+      f.sepX = 0;
+      f.sepY = 0;
+      f.touch = false;
       f.goal = null;
       f.goalTime = 0;
       f.target = null;
@@ -163,23 +166,68 @@ export class PondSimulation {
     return list;
   }
 
-  private openSpot(field: Field, samples = GOAL_SAMPLES): Goal {
+  private crowdOnPath(f: Fish, gx: number, gy: number): number {
+    const w = this.width;
+    const h = this.height;
+    const fx = f.x * w;
+    const fy = f.y * h;
+    const dx = gx * w - fx;
+    const dy = gy * h - fy;
+    const len2 = dx * dx + dy * dy || 1;
+    let crowd = 0;
+    for (const o of this.allFish) {
+      if (o === f) continue;
+      const ox = o.x * w;
+      const oy = o.y * h;
+      const t = clamp(((ox - fx) * dx + (oy - fy) * dy) / len2, 0, 1);
+      const reach = (BODY.length * f.size + BODY.length * o.size) * this.scale * 1.1;
+      if (Math.hypot(ox - (fx + dx * t), oy - (fy + dy * t)) < reach) crowd++;
+    }
+    return crowd;
+  }
+
+  private jamOf(f: Fish): number {
+    const w = this.width;
+    const h = this.height;
+    const L = BODY.length * f.size * this.scale;
+    let nn = Infinity;
+    for (const o of this.allFish) {
+      if (o === f) continue;
+      const d = Math.hypot((o.x - f.x) * w, (o.y - f.y) * h);
+      if (d < nn) nn = d;
+    }
+    return clamp(1 - nn / (L * 2.5), 0, 1);
+  }
+
+  private openSpot(field: Field, samples: number, f: Fish): Goal {
     let best: Goal = { x: 0.5, y: 0.5 };
-    let clear = -Infinity;
-    for (const s of this.spots(field, samples))
-      if (s.clear > clear) {
-        clear = s.clear;
+    let score = -Infinity;
+    for (const s of this.spots(field, samples)) {
+      const v =
+        s.clear - this.crowdOnPath(f, s.goal.x, s.goal.y) * BODY.length * f.size * this.scale * 1.5;
+      if (v > score) {
+        score = v;
         best = s.goal;
       }
+    }
     return best;
   }
 
   private escape(f: Fish, field: Field): void {
-    const spot = this.openSpot(field, 24);
+    const spot = this.openSpot(field, 24, f);
     f.goal = spot;
     f.goalTime = 6 + this.random() * 4;
     f.flee = 1.1;
-    f.fleeAngle = Math.atan2((spot.y - f.y) * this.height, (spot.x - f.x) * this.width);
+    const away = Math.atan2((spot.y - f.y) * this.height, (spot.x - f.x) * this.width);
+    const head = scanHeading(
+      field,
+      f.x * this.width,
+      f.y * this.height,
+      away,
+      BODY.length * f.size * this.scale,
+      handed(f.seed),
+    );
+    f.fleeAngle = head.block > 0 ? Math.atan2(head.y, head.x) : away;
   }
 
   pickGoal(f: Fish, field: Field): void {
@@ -187,7 +235,9 @@ export class PondSimulation {
     const w = this.width;
     const h = this.height;
     const span = Math.min(w, h);
-    const need = BODY.length * f.size * this.scale * 0.8;
+    const L = BODY.length * f.size * this.scale;
+    const need = L * 0.8;
+    const avoid = f.species === "silvercarp" ? this.jamOf(f) : 1;
     let best: Goal | null = null;
     let score = -Infinity;
     let room: Goal = { x: f.x, y: f.y };
@@ -203,7 +253,8 @@ export class PondSimulation {
       const sc =
         -Math.abs(wrap(Math.atan2(dy, dx) - f.angle)) * 1.2 +
         (Math.min(Math.hypot(dx, dy), span * 0.6) / span) * 2 +
-        r() * 0.6;
+        r() * 0.6 -
+        this.crowdOnPath(f, s.goal.x, s.goal.y) * 2.2 * avoid;
       if (sc > score) {
         score = sc;
         best = s.goal;
@@ -285,7 +336,14 @@ export class PondSimulation {
       const moved = Math.hypot((f.x - f.checkX) * w, (f.y - f.checkY) * h);
       f.checkX = f.x;
       f.checkY = f.y;
-      if (moved < L * 0.6 && f.flee <= 0 && f.rest <= 0 && !f.target && f.peck <= 0)
+      if (
+        moved < L * 0.6 &&
+        f.flee <= 0 &&
+        f.rest <= 0 &&
+        !f.target &&
+        f.peck <= 0 &&
+        !(f.touch && field.clearance(x, y) < L * 1.2)
+      )
         this.escape(f, field);
     }
     let gx: number;
@@ -410,7 +468,7 @@ export class PondSimulation {
               best = o;
             }
           }
-          if (best) {
+          if (best && bd < L * 6) {
             f.chase = best;
             f.chaseT = 1.5 + random() * 1.5;
             const away = Math.atan2((best.y - f.y) * h, (best.x - f.x) * w);
@@ -439,6 +497,7 @@ export class PondSimulation {
     let cx = 0;
     let cy = 0;
     let companions = 0;
+    let gapMin = Infinity;
     for (const o of neighbours) {
       if (o === f) continue;
       const ox = o.x * w - x;
@@ -454,6 +513,7 @@ export class PondSimulation {
       if (d < (L + Lo) * 0.75) {
         const hit = spineGap(f, o, s, o.size * this.scale);
         if (hit) {
+          if (hit.gap < gapMin) gapMin = hit.gap;
           const reach = (L + Lo) * 0.22;
           if (hit.gap < reach) {
             k = Math.min(1.5, (1 - hit.gap / reach) ** 2) * near;
@@ -471,7 +531,8 @@ export class PondSimulation {
         sy += ky * k;
       }
       if ((ox * cos + oy * sin) / d > 0.8 && d < L * 1.6 && near > 0.3) {
-        const side = oy * cos - ox * sin > 0 ? -1 : 1;
+        const perp = (oy * cos - ox * sin) / d;
+        const side = Math.abs(perp) < 0.2 ? handed(f.seed) : perp > 0 ? -1 : 1;
         const k = 0.35 * (1 - d / (L * 1.6));
         sx -= sin * side * k;
         sy += cos * side * k;
@@ -509,10 +570,14 @@ export class PondSimulation {
       f.chase = null;
       f.chaseCd = 30 + random() * 20;
     }
-    const sm = Math.hypot(sx, sy);
-    const sw = sm / (sm + sepK);
-    const nx = sm > 0 ? sx / sm : 0;
-    const ny = sm > 0 ? sy / sm : 0;
+    const ease = 1 - Math.exp(-dt * 3);
+    f.sepX += (sx - f.sepX) * ease;
+    f.sepY += (sy - f.sepY) * ease;
+    const sm = Math.hypot(f.sepX, f.sepY);
+    const crowd = sm / (sm + sepK);
+    const sw = Math.min(f.flee > 0 ? 0.95 : 0.72, crowd);
+    const nx = sm > 0 ? f.sepX / sm : 0;
+    const ny = sm > 0 ? f.sepY / sm : 0;
     const tx = gx * (1 - sw) + nx * sw + ax * 0.15;
     const ty = gy * (1 - sw) + ny * sw + ay * 0.15;
     const tl = Math.hypot(tx, ty) || 1;
@@ -523,6 +588,14 @@ export class PondSimulation {
     turnGain += block * 6;
     maxTurn *= 1 + 2.2 * block;
     want *= 1 - 0.6 * block;
+    if (f.flee <= 0) {
+      want *= 1 - 0.55 * crowd;
+      if (gapMin < 0 && !food) want *= 0.25;
+      if (block < 0.3) {
+        turnGain *= 1 - 0.5 * crowd;
+        maxTurn *= 1 - 0.5 * crowd;
+      }
+    }
     f.turn +=
       (clamp(wrap(desired - f.angle) * turnGain, -maxTurn, maxTurn) - f.turn) *
       Math.min(1, dt * (f.flee > 0 ? 14 : silver ? 7 : 4));
@@ -556,6 +629,7 @@ export class PondSimulation {
     );
     f.x = px / w;
     f.y = py / h;
+    f.touch = gapMin < 0;
     f.depth += (f.depthGoal - f.depth) * Math.min(1, dt * (food ? 1.2 : f.peck > 0 ? 2.4 : 0.35));
     updateSpine(f, s, w, h);
   }
