@@ -61,9 +61,6 @@ export interface Fish extends StoredFish {
   thrust: number;
   amp: number;
   beating: boolean;
-  sepX: number;
-  sepY: number;
-  touch: boolean;
   depth: number;
   depthGoal: number;
   goal: Goal | null;

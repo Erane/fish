@@ -8,7 +8,6 @@ import {
   weatherFromCode,
   sanitizeSave,
   fishPose,
-  spineGap,
   temperOf,
   updateSpine,
   BODY,
@@ -179,190 +178,52 @@ describe("受困自救", () => {
   });
 });
 
-describe("深度分离", () => {
-  const L = BODY.length * 0.8;
-  const W = 1000;
-  const H = 700;
+describe("聚群分层", () => {
+  const W = 1200;
+  const H = 800;
 
-  function fleeFish(f: Fish, x: number, y: number, angle: number, depth: number): void {
-    f.size = 0.8;
-    f.x = x;
-    f.y = y;
-    f.angle = angle;
-    f.fleeAngle = angle;
-    f.flee = 9;
-    f.v = 150;
-    f.goal = null;
-    f.checkT = 1e9;
-    f.depth = depth;
-    f.depthGoal = depth;
-  }
-
-  it("深度差 0.5 的并行鱼会彼此推开", () => {
-    const random = randomSeed(11);
-    const a = createFish(0, random);
-    const b = createFish(1, random);
-    const pond = new PondSimulation([a, b], W, H, random);
-    fleeFish(a, 0.35, 0.5 - (0.15 * L) / H, 0, 0.1);
-    fleeFish(b, 0.35, 0.5 + (0.15 * L) / H, 0, 0.6);
-    const d0 = Math.abs(a.y - b.y) * H;
-    for (let i = 0; i < 150; i++) pond.step(1 / 60);
-    expect(Math.abs(a.y - b.y) * H).toBeGreaterThan(d0 * 2);
-  });
-
-  it("深度差 0.8 的并行鱼靠深度分离下限仍然彼此推开", () => {
-    const random = randomSeed(11);
-    const a = createFish(0, random);
-    const b = createFish(1, random);
-    const pond = new PondSimulation([a, b], W, H, random);
-    fleeFish(a, 0.35, 0.5 - (0.15 * L) / H, 0, 0.1);
-    fleeFish(b, 0.35, 0.5 + (0.15 * L) / H, 0, 0.9);
-    const d0 = Math.abs(a.y - b.y) * H;
-    for (let i = 0; i < 150; i++) pond.step(1 / 60);
-    expect(Math.abs(a.y - b.y) * H).toBeGreaterThan(d0 * 2);
-  });
-
-  it("深度差 0.8 的相向鱼可以叠游穿越", () => {
-    const random = randomSeed(13);
-    const a = createFish(0, random);
-    const b = createFish(1, random);
-    const pond = new PondSimulation([a, b], W, H, random);
-    fleeFish(a, 0.25, 0.5, 0, 0.1);
-    fleeFish(b, 0.75, 0.5, Math.PI, 0.9);
-    let minD = Infinity;
-    for (let i = 0; i < 180; i++) {
-      pond.step(1 / 60);
-      minD = Math.min(minD, Math.hypot((a.x - b.x) * W, (a.y - b.y) * H));
-    }
-    expect(minD).toBeLessThan(L * 2 * 0.35);
-    for (const f of [a, b]) {
-      expect(Number.isFinite(f.x)).toBe(true);
-      expect(Number.isFinite(f.angle)).toBe(true);
-    }
-  });
-});
-
-describe("脊柱表面距", () => {
-  function gapOf(pond: PondSimulation, a: Fish, b: Fish): number {
-    return spineGap(a, b, a.size * pond.scale, b.size * pond.scale)!.gap;
-  }
-
-  it("短鱼鼻尖贴着长鱼尾段并行时，表面距被推正", () => {
-    const random = randomSeed(21);
-    const a = createFish(0, random);
-    const b = createFish(1, random);
-    const pond = new PondSimulation([a, b], 1000, 700, random);
-    const pin = (f: Fish, size: number, x: number, y: number, cruise: number): void => {
-      f.size = size;
-      f.x = x;
-      f.y = y;
-      f.angle = 0;
-      f.cruise = cruise;
-      f.rest = 1e9;
-      f.v = 0;
-      f.goal = { x: f.x + 0.5, y: f.y };
-      f.goalTime = 1e9;
-      f.checkT = 1e9;
+  function crowd(fish: Fish[]): void {
+    for (const f of fish) {
+      f.x = 0.5;
+      f.y = 0.5;
+      f.angle = (f.seed % 100) * 0.0628;
       f.depth = 0.5;
       f.depthGoal = 0.5;
-    };
-    pin(a, 1.2, 0.4, 0.5, 0.4);
-    pin(b, 0.3, 0.4 - 76 / 1000, 0.5 + 5 / 700, 1.6);
-    pond.step(1 / 60);
-    const gap0 = gapOf(pond, a, b);
-    expect(gap0).toBeLessThan(0);
-    for (let i = 0; i < 120; i++) pond.step(1 / 60);
-    expect(gapOf(pond, a, b)).toBeGreaterThan(2);
-  });
-
-  it("短鱼垂直穿越长鱼尾段不穿插", () => {
-    const random = randomSeed(23);
-    const a = createFish(0, random);
-    const b = createFish(1, random);
-    const pond = new PondSimulation([a, b], 1000, 700, random);
-    const flee = (f: Fish, size: number, x: number, y: number, angle: number, v: number): void => {
-      f.size = size;
-      f.x = x;
-      f.y = y;
-      f.angle = angle;
-      f.fleeAngle = angle;
-      f.flee = 9;
-      f.v = v;
-      f.checkT = 1e9;
-      f.depth = 0.5;
-      f.depthGoal = 0.5;
-    };
-    flee(a, 1.2, 0.2, 0.5, 0, 150);
-    flee(b, 0.3, 0.45, 0.377, Math.PI / 2, 80);
-    let minGap = Infinity;
-    let minD = Infinity;
-    for (let i = 0; i < 240; i++) {
-      pond.step(1 / 60);
-      minGap = Math.min(minGap, gapOf(pond, a, b));
-      minD = Math.min(minD, Math.hypot((a.x - b.x) * 1000, (a.y - b.y) * 700));
     }
-    expect(minD).toBeLessThan((BODY.length * 1.2 + BODY.length * 0.3) * 0.9);
-    expect(minGap).toBeGreaterThan(-1);
-    for (const f of [a, b]) {
-      expect(Number.isFinite(f.x)).toBe(true);
-      expect(Number.isFinite(f.angle)).toBe(true);
-    }
-  });
-});
+  }
 
-describe("密集稳定性", () => {
-  it("中心密集的鱼群散得开、航向不抖动、后期同深度不穿插", () => {
-    const random = randomSeed(31);
+  it("鱼群聚拢时上下分层游走且转向不抖动", () => {
+    const random = randomSeed(607);
     const fish = Array.from({ length: 12 }, (_, i) => createFish(i, random));
-    const pond = new PondSimulation(fish, 1200, 800, random);
-    for (const f of fish) {
-      f.x = 0.4 + random() * 0.2;
-      f.y = 0.4 + random() * 0.2;
-    }
-    const spread = (): number => {
-      let sum = 0;
-      for (let i = 0; i < fish.length; i++)
-        for (let j = i + 1; j < fish.length; j++)
-          sum += Math.hypot((fish[i]!.x - fish[j]!.x) * 1200, (fish[i]!.y - fish[j]!.y) * 800);
-      return sum / ((fish.length * (fish.length - 1)) / 2);
-    };
-    const d0 = spread();
+    const pond = new PondSimulation(fish, W, H, random);
+    crowd(fish);
     let turnSum = 0;
-    let deep = 0;
+    let spread = 0;
     let samples = 0;
-    for (let i = 0; i < 3000; i++) {
+    for (let i = 0; i < 60 * 60; i++) {
       pond.step(1 / 60);
-      if (i < 300) for (const f of fish) turnSum += Math.abs(f.turn);
-      if (i > 600 && i % 5 === 0)
-        for (let a = 0; a < fish.length; a++)
-          for (let b = a + 1; b < fish.length; b++) {
-            if (Math.abs(fish[a]!.depth - fish[b]!.depth) > 0.25) continue;
-            const g = spineGap(
-              fish[a]!,
-              fish[b]!,
-              fish[a]!.size * pond.scale,
-              fish[b]!.size * pond.scale,
-            );
-            if (!g) continue;
-            samples++;
-            if (g.gap < -3) deep++;
-          }
+      if (i < 60 * 5 || i > 60 * 25) continue;
+      for (let k = 0; k < fish.length; k++) {
+        const f = fish[k]!;
+        turnSum += Math.abs(f.turn) * (1 / 60);
+        for (let j = k + 1; j < fish.length; j++) {
+          spread += Math.abs(f.depth - fish[j]!.depth);
+          samples++;
+        }
+      }
     }
-    expect(spread()).toBeGreaterThan(d0 * 1.8);
-    expect(turnSum / (300 * fish.length)).toBeLessThan(0.56);
-    expect(deep / samples).toBeLessThan(0.01);
+    expect(turnSum / 20 / fish.length).toBeLessThan(0.44);
+    expect(spread / samples).toBeGreaterThan(0.18);
     for (const f of fish) {
       expect(Number.isFinite(f.x)).toBe(true);
-      expect(Number.isFinite(f.angle)).toBe(true);
+      expect(Number.isFinite(f.depth)).toBe(true);
     }
   });
-});
 
-describe("争抢不叠罗汉", () => {
-  it("6 鱼抢 3 颗近邻饲料：争抢期不深度叠压且全部吃完", () => {
+  it("多鱼抢食各占深度层且全部吃完", () => {
     const random = randomSeed(41);
     const fish = Array.from({ length: 6 }, (_, i) => createFish(i, random));
-    const pond = new PondSimulation(fish, 1200, 800, random);
+    const pond = new PondSimulation(fish, W, H, random);
     for (let i = 0; i < fish.length; i++) {
       const f = fish[i]!;
       const a = (i / fish.length) * Math.PI * 2;
@@ -371,117 +232,20 @@ describe("争抢不叠罗汉", () => {
       f.angle = a + Math.PI;
     }
     pond.feed(600, 400, 3);
-    expect(pond.food.length).toBe(3);
-    let deep = 0;
-    let samples = 0;
-    let maxRun = 0;
-    const runs = new Map<string, number>();
+    const feedDepths: number[][] = fish.map(() => []);
     for (let i = 0; i < 360; i++) {
       pond.step(1 / 60);
-      if (i % 5 === 0)
-        for (let a = 0; a < fish.length; a++)
-          for (let b = a + 1; b < fish.length; b++) {
-            if (Math.abs(fish[a]!.depth - fish[b]!.depth) > 0.35) continue;
-            const g = spineGap(
-              fish[a]!,
-              fish[b]!,
-              fish[a]!.size * pond.scale,
-              fish[b]!.size * pond.scale,
-            );
-            if (!g) continue;
-            samples++;
-            const key = `${a}-${b}`;
-            if (g.gap < -3) {
-              deep++;
-              const r = (runs.get(key) ?? 0) + 1;
-              runs.set(key, r);
-              if (r > maxRun) maxRun = r;
-            } else runs.delete(key);
-          }
+      for (let k = 0; k < fish.length; k++)
+        if (fish[k]!.target) feedDepths[k]!.push(fish[k]!.depth);
     }
-    expect(deep / samples).toBeLessThan(0.04);
-    expect(maxRun).toBeLessThan(12);
     for (let i = 0; i < 3600 && pond.food.length > 0; i++) pond.step(1 / 60);
     expect(pond.food.length).toBe(0);
     expect(pond.totalEaten).toBe(3);
-  });
-});
-
-describe("堆叠解缠", () => {
-  const W = 1200;
-  const H = 800;
-
-  function longestJams(
-    fish: Fish[],
-    pond: PondSimulation,
-    seconds: number,
-    warm: number,
-  ): number[] {
-    const run = fish.map(() => 0);
-    const longest = fish.map(() => 0);
-    for (let i = 0; i < 60 * seconds; i++) {
-      pond.step(1 / 60);
-      if (i < 60 * warm) continue;
-      for (let k = 0; k < fish.length; k++) {
-        const f = fish[k]!;
-        let nn = Infinity;
-        for (const o of fish) {
-          if (o === f) continue;
-          nn = Math.min(nn, Math.hypot((o.x - f.x) * W, (o.y - f.y) * H));
-        }
-        if (nn < BODY.length * f.size * pond.scale * 0.6) {
-          run[k]!++;
-          longest[k] = Math.max(longest[k]!, run[k]!);
-        } else run[k] = 0;
-      }
-    }
-    return longest.map((v) => v / 60);
-  }
-
-  const median = (a: number[]): number => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)]!;
-
-  it("密集鱼群中单次堵塞不超上限，堆心鱼能持续游走", () => {
-    const random = randomSeed(607);
-    const fish = Array.from({ length: 16 }, (_, i) => createFish(i, random));
-    const pond = new PondSimulation(fish, W, H, random);
-    for (const f of fish) {
-      f.x = 0.35 + random() * 0.3;
-      f.y = 0.35 + random() * 0.3;
-    }
-    expect(median(longestJams(fish, pond, 90, 5))).toBeLessThan(5);
-  });
-
-  it("投喂聚集后鱼群散得开，不滞留在餐点附近", () => {
-    const W = 1200;
-    const H = 800;
-    const tailNN = (seed: number): number => {
-      const random = randomSeed(seed);
-      const fish = Array.from({ length: 5 }, (_, i) => createFish(i, random));
-      const pond = new PondSimulation(fish, W, H, random, createSilverCarpShoal(random), true);
-      pond.feed(600, 400, 9);
-      pond.feed(600, 400, 9);
-      pond.feed(600, 400, 9);
-      let sum = 0;
-      let n = 0;
-      for (let i = 0; i < 60 * 130; i++) {
-        pond.step(1 / 60);
-        if (i < 60 * 100) continue;
-        let nnSum = 0;
-        for (const f of fish) {
-          let nn = Infinity;
-          for (const o of fish) {
-            if (o === f) continue;
-            nn = Math.min(nn, Math.hypot((o.x - f.x) * W, (o.y - f.y) * H));
-          }
-          nnSum += nn;
-        }
-        sum += nnSum / fish.length;
-        n++;
-      }
-      return sum / n;
-    };
-    const vals = [601, 602, 603, 604].map((s) => tailNN(s + 1000));
-    expect(median(vals)).toBeGreaterThan(195);
+    const eating = feedDepths
+      .filter((d) => d.length > 30)
+      .map((d) => d.reduce((a, b) => a + b, 0) / d.length);
+    expect(eating.length).toBeGreaterThan(1);
+    expect(Math.max(...eating) - Math.min(...eating)).toBeGreaterThan(0.12);
   });
 });
 

@@ -11,7 +11,6 @@ export {
   revive,
   updateSpine,
   fishPose,
-  spineGap,
   temperOf,
 } from "./fish.ts";
 export type { Temper } from "./types.ts";

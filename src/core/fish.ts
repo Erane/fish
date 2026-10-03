@@ -57,9 +57,6 @@ function makeFish(seed: FishSeed, random: () => number): Fish {
     thrust: 0,
     amp: 0.25,
     beating: false,
-    sepX: 0,
-    sepY: 0,
-    touch: false,
     depth: 0.5,
     depthGoal: 0.5,
     goal: null,
@@ -253,40 +250,4 @@ export function fishPose(
     out[i * 4 + 3] = tx / l;
   }
   return out;
-}
-
-const SEP_WIDTHS = [
-  0.55, 0.8, 0.95, 1, 1, 0.98, 0.94, 0.9, 0.85, 0.8, 0.74, 0.66, 0.58, 0.5, 0.42, 0.3, 0.18,
-] as const;
-
-export function spineGap(
-  a: Fish,
-  b: Fish,
-  sa: number,
-  sb: number,
-): { gap: number; px: number; py: number } | null {
-  const pa = a.spine;
-  const pb = b.spine;
-  if (!pa || !pb) return null;
-  let gap = Infinity;
-  let px = 0;
-  let py = 0;
-  for (let i = 0; i <= BODY.segments; i++) {
-    const ax = pa[i * 2]!;
-    const ay = pa[i * 2 + 1]!;
-    const ra = SEP_WIDTHS[i]! * BODY.half * sa;
-    for (let j = 0; j <= BODY.segments; j++) {
-      const dx = ax - pb[j * 2]!;
-      const dy = ay - pb[j * 2 + 1]!;
-      if (Math.abs(dx) + Math.abs(dy) - ra - SEP_WIDTHS[j]! * BODY.half * sb >= gap) continue;
-      const dist = Math.hypot(dx, dy) || 1e-4;
-      const g = dist - ra - SEP_WIDTHS[j]! * BODY.half * sb;
-      if (g < gap) {
-        gap = g;
-        px = dx / dist;
-        py = dy / dist;
-      }
-    }
-  }
-  return { gap, px, py };
 }

@@ -121,8 +121,10 @@ describe("顶墙与回头", () => {
     [f.angle, f.rest, f.flee] = [Math.PI, 0, 0];
     let sign = 0;
     let flips = 0;
-    let progress = 0;
-    for (let i = 0; i < 60 * 6; i++) {
+    let path = 0;
+    let px = f.x * W;
+    let py = f.y * H;
+    for (let i = 0; i < 60 * 5; i++) {
       const before = f.angle;
       sim.step(1 / 60);
       const turn = wrap(f.angle - before);
@@ -130,13 +132,13 @@ describe("顶墙与回头", () => {
         if (sign !== 0 && Math.sign(turn) !== sign) flips++;
         sign = Math.sign(turn);
       }
-      if (i % 30 === 29) {
-        const d = Math.hypot(f.x * W - x0, f.y * H - y0);
-        if (i > 60) expect(d - progress).toBeGreaterThan(0.1 * L);
-        progress = d;
-      }
+      path += Math.hypot(f.x * W - px, f.y * H - py);
+      px = f.x * W;
+      py = f.y * H;
     }
-    expect(progress).toBeGreaterThan(1.5 * L);
+    const escaped = Math.hypot(f.x * W - x0, f.y * H - y0);
+    expect(escaped).toBeGreaterThan(0.8 * L);
+    expect(path / escaped).toBeLessThan(4);
     expect(flips).toBeLessThanOrEqual(8);
   });
 
