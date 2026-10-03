@@ -32,7 +32,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,svg,png}"],
+        globPatterns: ["**/*.{js,css,html,svg,png,webp}"],
         globIgnores: ["**/theme/**", "!**/theme/themes.json"],
         navigateFallback: "index.html",
         runtimeCaching: [

@@ -35,6 +35,6 @@
     }
   },
   "seasons": {
-    "autumn": { "image": "autumn.png", "tint": { "water": "#2e6b78" } }
+    "autumn": { "image": "autumn.webp", "tint": { "water": "#2e6b78" } }
   }
 }

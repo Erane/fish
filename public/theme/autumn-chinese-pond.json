@@ -72,7 +72,7 @@
   },
   "seasons": {
     "autumn": {
-      "image": "autumn.png",
+      "image": "autumn.webp",
       "tint": {
         "water": "#2daebf"
       }
