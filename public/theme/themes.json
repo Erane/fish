@@ -4,6 +4,14 @@
     {
       "url": "theme/autumn-chinese-pond.json",
       "images": { "autumn": "theme/autumn-chinese-pond.webp" }
+    },
+    {
+      "url": "theme/Lotus.json",
+      "images": { "summer": "theme/Lotus.webp" }
+    },
+    {
+      "url": "theme/Lotus2.json",
+      "images": { "summer": "theme/Lotus2.webp" }
     }
   ]
 }
