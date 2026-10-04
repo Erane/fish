@@ -10,7 +10,7 @@ export interface QualitySpec {
 
 export const QUALITY_SPEC: Record<Quality, QualitySpec> = {
   ultra: { dprCap: null, pixelCap: Number.POSITIVE_INFINITY, auxDiv: 3, simCell: 3, frameHz: 60 },
-  high: { dprCap: 2, pixelCap: 3.6e6, auxDiv: 2, simCell: 3, frameHz: 60 },
+  high: { dprCap: 2, pixelCap: 3840 * 2160, auxDiv: 2, simCell: 3, frameHz: 60 },
   eco: { dprCap: 1, pixelCap: 1.6e6, auxDiv: 3, simCell: 4, frameHz: 30 },
 };
 

@@ -169,11 +169,13 @@ async function boot(): Promise<void> {
     packId = seeded[0];
   }
   let skins: Partial<Record<SkinSpecies, FishSkin>> = {};
+  let packStyle: string | null = null;
   if (packId) {
     const resolved = await resolvePack(packId, saved?.skinBindings);
     if (resolved) {
       bed = packBed(resolved.pack, resolved.asset, resolved.image);
       skins = buildPackSkins(resolved.skins);
+      packStyle = resolved.pack.style;
     }
   }
   const fish = saved?.fish
@@ -219,6 +221,7 @@ async function boot(): Promise<void> {
   }
   scene = new PondScene(renderer, sim, bed);
   scene.setSeasonTint(bed.tint);
+  scene.setBedStyle(packStyle);
   scene.setSkins(skins);
   scene.onLightning = (k) => audio?.thunderAfter(0.4 + Math.random() * 2.2, k);
   const wallpaper = isWallpaper();

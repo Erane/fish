@@ -43,7 +43,7 @@
 
 ## 画风
 
-`style` 为自由字符串标签（`cel`/`realistic`/`anime`…），仅用于分类展示，不影响渲染。画风由底图与鱼皮肤本身决定。
+`style` 为画风标签（`cel`/`realistic`/`anime`…），是渲染调色预设的选择键：预设唯一真相源在 `src/scene/look.ts` 的 `STYLE_GRADE`，经 `lookFor()` 叠加到天气/昼夜 Look，`PondScene.setBedStyle()` 在 `src/main.ts` 的 `boot` 注入当前包的标签。`realistic` 收敛纸张/量化/水深雾效让底图接近直出，`anime` 保留轻度版画感，未知标签与 `cel`（程序化池塘）回退全档水彩纸感。预设只覆盖画面质感字段（`bedSoft`/`depth`/posterize 系/paper 系/`grain`/`vignette`），天气与昼夜氛围字段（亮/饱和/天光/涟漪等）不受画风影响。包底图以原图分辨率进 GPU 纹理（`packBed()` 不做降采样），画面清晰度上限由画质档位决定（`src/render/quality.ts`）。
 
 ## 皮肤库与绑定
 

@@ -44,6 +44,7 @@ const LOOKS: Record<Weather, LookBase> = {
     sheenFloor: 0,
     mist: 0,
     depth: 1,
+    bedSoft: 1.8,
     posterize: GRADE.posterize,
     posterMix: GRADE.posterMix,
     paperMix: GRADE.paperMix,
@@ -77,6 +78,7 @@ const LOOKS: Record<Weather, LookBase> = {
     sheenFloor: 0,
     mist: 0,
     depth: 1,
+    bedSoft: 1.8,
     posterize: 14,
     posterMix: 0.5,
     paperMix: 0.26,
@@ -110,6 +112,7 @@ const LOOKS: Record<Weather, LookBase> = {
     sheenFloor: 0.62,
     mist: 0.03,
     depth: 0.8,
+    bedSoft: 1.8,
     posterize: 14,
     posterMix: 0.5,
     paperMix: 0.24,
@@ -143,6 +146,7 @@ const LOOKS: Record<Weather, LookBase> = {
     sheenFloor: 0.35,
     mist: 0.04,
     depth: 0.8,
+    bedSoft: 1.8,
     posterize: 16,
     posterMix: 0.55,
     paperMix: 0.3,
@@ -152,6 +156,27 @@ const LOOKS: Record<Weather, LookBase> = {
 };
 
 const clone3 = (v: Vec3): Vec3 => [v[0], v[1], v[2]];
+
+const STYLE_GRADE: Record<string, Partial<Look>> = {
+  realistic: {
+    bedSoft: 0.4,
+    depth: 0.4,
+    posterMix: 0,
+    paperMix: 0.04,
+    paperLift: 0.08,
+    grain: 0.008,
+    vignette: 0.22,
+  },
+  anime: {
+    bedSoft: 0.8,
+    depth: 0.7,
+    posterMix: 0.15,
+    paperMix: 0.1,
+    paperLift: 0.12,
+    grain: 0.012,
+    vignette: 0.3,
+  },
+};
 
 function cloneBase(b: LookBase): LookBase {
   return {
@@ -164,7 +189,13 @@ function cloneBase(b: LookBase): LookBase {
   };
 }
 
-export function lookFor(weather: Weather, night: boolean, rain = 0.5, snow = 0.5): Look {
+export function lookFor(
+  weather: Weather,
+  night: boolean,
+  rain = 0.5,
+  snow = 0.5,
+  style?: string | null,
+): Look {
   const l: Look = {
     ...cloneBase(LOOKS[weather] ?? LOOKS.sunny),
     sun: [-0.45, 0.45, 0.77],
@@ -220,6 +251,8 @@ export function lookFor(weather: Weather, night: boolean, rain = 0.5, snow = 0.5
       paperMix: l.paperMix * 1.15,
       grain: l.grain * 0.6,
     });
+  const preset = style ? STYLE_GRADE[style] : undefined;
+  if (preset) Object.assign(l, preset);
   return l;
 }
 

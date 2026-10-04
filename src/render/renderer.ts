@@ -557,7 +557,7 @@ export function createRenderer(
     gl.uniform3fv(p.u("uCausticTint"), env.causticTint);
     gl.uniform1f(p.u("uDepthK"), env.depth);
     gl.uniform3fv(p.u("uDeepTint"), [...DEEP_TINT]);
-    gl.uniform1f(p.u("uBedSoft"), 1.8);
+    gl.uniform1f(p.u("uBedSoft"), env.bedSoft);
     gl.uniform1f(p.u("uPosterize"), env.posterize);
     gl.uniform1f(p.u("uPosterMix"), env.posterMix);
     gl.uniform1f(p.u("uPaperMix"), env.paperMix);

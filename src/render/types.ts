@@ -31,6 +31,7 @@ export interface Look {
   sheenFloor: number;
   mist: number;
   depth: number;
+  bedSoft: number;
   posterize: number;
   posterMix: number;
   paperMix: number;

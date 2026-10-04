@@ -91,3 +91,37 @@ describe("lookFor", () => {
     expect(k2[0]!.wave).toBeLessThan(s.wave + 0.1);
   });
 });
+
+describe("lookFor style presets", () => {
+  it("realistic 让底图接近直出：纸张/量化/水深雾效全面收敛", () => {
+    for (const w of WEATHERS) {
+      const base = lookFor(w, false);
+      const photo = lookFor(w, false, 0.5, 0.5, "realistic");
+      expect(photo.bedSoft).toBeLessThan(base.bedSoft);
+      expect(photo.depth).toBeLessThan(base.depth);
+      expect(photo.posterMix).toBeLessThan(base.posterMix);
+      expect(photo.paperMix).toBeLessThan(base.paperMix);
+      expect(photo.paperLift).toBeLessThan(base.paperLift);
+      expect(photo.grain).toBeLessThan(base.grain);
+      expect(photo.vignette).toBeLessThan(base.vignette);
+    }
+  });
+
+  it("anime 保留轻度版画感但弱于水彩纸感", () => {
+    const base = lookFor("sunny", false);
+    const anime = lookFor("sunny", false, 0.5, 0.5, "anime");
+    expect(anime.bedSoft).toBeLessThan(base.bedSoft);
+    expect(anime.posterMix).toBeGreaterThan(0);
+    expect(anime.posterMix).toBeLessThan(base.posterMix);
+    expect(anime.paperMix).toBeLessThan(base.paperMix);
+  });
+
+  it("未知画风与缺省一致，天气氛围不被画风改写", () => {
+    const none = lookFor("sunny", false);
+    expect(lookFor("sunny", false, 0.5, 0.5, "woodcut")).toEqual(none);
+    const photo = lookFor("sunny", false, 0.5, 0.5, "realistic");
+    expect(photo.bright).toBe(none.bright);
+    expect(photo.sat).toBe(none.sat);
+    expect(photo.skyK).toBe(none.skyK);
+  });
+});

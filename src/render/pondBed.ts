@@ -61,13 +61,11 @@ export function packBed(
   pack: PondPack,
   asset: SeasonAsset,
   image: HTMLImageElement | ImageBitmap,
-  maxSpan = 1600,
 ): PondBed {
   const iw = "naturalWidth" in image ? image.naturalWidth : image.width;
   const ih = "naturalHeight" in image ? image.naturalHeight : image.height;
-  const k = maxSpan / Math.max(iw, ih);
-  const bedW = Math.max(2, Math.round(iw * k));
-  const bedH = Math.max(2, Math.round(ih * k));
+  const bedW = Math.max(2, iw);
+  const bedH = Math.max(2, ih);
   const texture = document.createElement("canvas");
   texture.width = bedW;
   texture.height = bedH;

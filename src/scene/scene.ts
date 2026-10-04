@@ -112,6 +112,7 @@ export class PondScene {
   look: Look;
   onLightning: ((strength: number) => void) | null = null;
   private seasonTint: Vec3 | null = null;
+  private bedStyle: string | null = null;
   private skins: Partial<Record<SkinSpecies, FishSkin>> = {};
   w = 1;
   h = 1;
@@ -162,8 +163,12 @@ export class PondScene {
     this.seasonTint = hex ? hexToRgb01(hex) : null;
   }
 
+  setBedStyle(style: string | null): void {
+    this.bedStyle = style;
+  }
+
   setLook(weather: Weather, night: boolean, dt: number, rain = 0.5, snow = 0.5, caustic = 1): void {
-    const target = lookFor(weather, night, rain, snow);
+    const target = lookFor(weather, night, rain, snow, this.bedStyle);
     target.caustic *= caustic;
     if (this.seasonTint) {
       const t = this.seasonTint;

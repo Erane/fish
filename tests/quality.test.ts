@@ -19,10 +19,17 @@ describe("renderSizes", () => {
     expect(s.surface).toEqual(s.shadow);
   });
 
-  test("high 主画布封顶 3.6MP，辅助 pass 为画布的 1/2", () => {
+  test("high 主画布封顶 8.3MP（4K 原生），辅助 pass 为画布的 1/2", () => {
     const s = renderSizes(1920, 1080, 2, "high");
-    expect(s.cw * s.ch).toBeLessThanOrEqual(3.6e6);
+    expect(s.cw).toBe(3840);
+    expect(s.ch).toBe(2160);
     expect(s.shadow).toEqual([Math.ceil(s.cw / 2), Math.ceil(s.ch / 2)]);
+  });
+
+  test("high 在超过 4K 原生像素量时收敛回上限内", () => {
+    const s = renderSizes(3840, 2160, 2, "high");
+    expect(s.cw).toBe(3840);
+    expect(s.ch).toBe(2160);
   });
 
   test("ultra 不封顶，主画布为原生设备像素", () => {
