@@ -11,6 +11,8 @@
 
 用户把底图交给任意多模态 AI，连同下面的提示词，让 AI 回填 JSON。图片二进制不进 JSON：`image` 只是文件名占位，导入时由 `seasonAssetId()` 生成资产键并绑定用户在面板上选的那张图。
 
+内置主题底图统一为 WebP：PNG/JPG 母图放进 `public/theme/` 后由 `scripts/convert-theme.mjs` 转换（`pnpm theme` 手动，`dev`/`build` 前自动），母图移入 `.tmp/theme-masters/` 备份；质量参数（q93，视觉无损档位的既定决策）以脚本内常量为唯一真相源。
+
 ## 坐标语义（类型里没有的关键约定）
 
 - 所有坐标归一化到 `[0,1]`，原点左上，相对**整张底图**（不是相对水面）。
