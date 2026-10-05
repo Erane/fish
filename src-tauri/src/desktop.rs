@@ -39,10 +39,6 @@ pub fn virtual_screen() -> VirtualScreen {
     }
 }
 
-pub fn to_local(x: i32, y: i32, vs: VirtualScreen) -> (i32, i32) {
-    (x - vs.x, y - vs.y)
-}
-
 pub fn class_is(hwnd: HWND, class: PCWSTR) -> bool {
     let wide = unsafe { class.as_wide() };
     let mut buf = [0u16; 64];
@@ -393,18 +389,6 @@ mod tests {
 
     fn hwnd(id: usize) -> HWND {
         HWND(id as *mut _)
-    }
-
-    #[test]
-    fn local_coords_offset_by_virtual_origin() {
-        let vs = VirtualScreen {
-            x: -1920,
-            y: 0,
-            w: 3840,
-            h: 1080,
-        };
-        assert_eq!(to_local(-1920, 0, vs), (0, 0));
-        assert_eq!(to_local(0, 1079, vs), (1920, 1079));
     }
 
     #[test]

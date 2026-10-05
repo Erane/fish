@@ -10,7 +10,7 @@ use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindo
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_single_instance::init as single_instance;
 
-const WALLPAPER: &str = "wallpaper";
+pub(crate) const WALLPAPER: &str = "wallpaper";
 const POND: &str = "pond";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
